@@ -91,7 +91,7 @@ export interface Conteo {
 // Cola de sincronización: cada mutación local genera una operación pendiente
 export interface OperacionSync {
   id: string;
-  tipo: 'CONTEO' | 'PRODUCTO' | 'CATEGORIA' | 'UBICACION' | 'USUARIO' | 'SUCURSAL';
+  tipo: 'CONTEO' | 'PRODUCTO' | 'CATEGORIA' | 'UBICACION' | 'USUARIO';
   entidadId: string;
   payload: unknown;
   accion: 'CREAR' | 'ACTUALIZAR' | 'ELIMINAR';

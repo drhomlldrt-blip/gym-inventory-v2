@@ -6,7 +6,7 @@ import { iniciarListenerSync } from '@/lib/sync';
 
 // Indicador discreto de estado (requisito 24):
 // 🟢 Sincronizado  🟠 Pendiente  🔴 Sin conexión
-export default function SyncIndicator({ variant = 'light' }: { variant?: 'light' | 'dark' }) {
+export default function SyncIndicator() {
   const [online, setOnline] = useState(true);
   const [pendientes, setPendientes] = useState(0);
   const [syncing, setSyncing] = useState(false);
@@ -38,21 +38,21 @@ export default function SyncIndicator({ variant = 'light' }: { variant?: 'light'
     setPendientes(await contarPendientesSync());
   }
 
-  let color = 'bg-accent';
+  let color = 'bg-green-500';
   let texto = 'Sincronizado';
   if (!online) {
     color = 'bg-red-500';
     texto = 'Sin conexión';
   } else if (syncing) {
-    color = 'bg-brand animate-pulse';
+    color = 'bg-orange-500 animate-pulse';
     texto = 'Sincronizando...';
   } else if (pendientes > 0) {
-    color = 'bg-brand';
+    color = 'bg-orange-500';
     texto = `${pendientes} pendiente${pendientes === 1 ? '' : 's'}`;
   }
 
   return (
-    <div className={`flex items-center gap-2 text-xs ${variant === 'dark' ? 'text-white/60' : 'text-ink/60'}`}>
+    <div className="flex items-center gap-2 text-xs text-muted">
       <span className={`w-2.5 h-2.5 rounded-full ${color}`} />
       <span>{texto}</span>
     </div>

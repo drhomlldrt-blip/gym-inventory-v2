@@ -5,6 +5,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { useRouter } from 'next/navigation';
 import { db, encolarOperacion } from '@/lib/db';
 import { Producto, TipoPresentacion } from '@/types';
+import { descargarCatalogo } from '@/lib/sync';
 import SyncIndicator from '@/components/SyncIndicator';
 
 const PRESENTACIONES: TipoPresentacion[] = ['PAQUETE', 'CAJA', 'BOLSA', 'FARDO', 'UNIDAD'];
@@ -23,7 +24,11 @@ export default function AdminProductosPage() {
 
   useEffect(() => {
     const id = sessionStorage.getItem('usuarioActivoId');
-    if (!id) router.push('/');
+    if (!id) {
+      router.push('/');
+      return;
+    }
+    descargarCatalogo();
   }, [router]);
 
   async function alternarActivo(p: Producto) {
@@ -67,21 +72,18 @@ export default function AdminProductosPage() {
   }
 
   return (
-    <main className="max-w-md mx-auto p-4 pb-10 flex flex-col gap-4">
+    <main className="max-w-md mx-auto p-4 pb-10 flex flex-col gap-4 min-h-screen bg-surface">
       <div className="flex justify-between items-center">
-        <h1 className="text-xl font-bold">Productos</h1>
+        <h1 className="text-xl font-bold text-paper">Productos</h1>
         <SyncIndicator />
       </div>
 
-      <div className="flex gap-3 text-sm flex-wrap">
-        <button onClick={() => router.push('/historial')} className="text-accent-hover underline">
+      <div className="flex gap-3 text-sm">
+        <button onClick={() => router.push('/historial')} className="text-muted underline">
           Historial de conteos →
         </button>
-        <button onClick={() => router.push('/admin/ubicaciones')} className="text-accent-hover underline">
+        <button onClick={() => router.push('/admin/ubicaciones')} className="text-muted underline">
           Gestionar ubicaciones →
-        </button>
-        <button onClick={() => router.push('/admin/usuarios')} className="text-accent-hover underline">
-          Gestionar usuarios →
         </button>
       </div>
 
@@ -100,38 +102,38 @@ export default function AdminProductosPage() {
           if (productosCategoria.length === 0) return null;
           return (
             <div key={cat.id} className="flex flex-col gap-2">
-              <h2 className="text-sm font-semibold text-ink/60">{cat.nombre}</h2>
+              <h2 className="text-sm font-semibold text-slate-300">{cat.nombre}</h2>
               {productosCategoria.map((p, idx) => (
                 <div key={p.id} className="bg-surface-card rounded-xl border border-surface-border p-4 flex items-center gap-2">
                   <div className="flex flex-col">
                     <button
                       onClick={() => moverProducto(p, 'subir')}
                       disabled={idx === 0}
-                      className="text-ink/40 disabled:opacity-20 leading-none px-1"
+                      className="text-muted disabled:opacity-20 leading-none px-1"
                     >
                       ▲
                     </button>
                     <button
                       onClick={() => moverProducto(p, 'bajar')}
                       disabled={idx === productosCategoria.length - 1}
-                      className="text-ink/40 disabled:opacity-20 leading-none px-1"
+                      className="text-muted disabled:opacity-20 leading-none px-1"
                     >
                       ▼
                     </button>
                   </div>
                   <button className="text-left flex-1" onClick={() => setEditando(p)}>
-                    <p className="font-medium">{p.nombre}</p>
-                    <p className="text-xs text-ink/40">
+                    <p className="font-medium text-paper">{p.nombre}</p>
+                    <p className="text-xs text-muted">
                       {p.tipoPresentacion === 'UNIDAD' ? 'Solo por unidad' : `${p.unidadesPorPaquete} u/${p.tipoPresentacion.toLowerCase()}`}
                     </p>
                   </button>
                   <button
                     onClick={() => alternarActivo(p)}
-                    className={`text-xs px-3 py-1.5 rounded-full font-semibold whitespace-nowrap ${p.estado === 'ACTIVO' ? 'bg-accent-soft text-accent-hover' : 'bg-surface text-ink/40'}`}
+                    className={`text-xs px-3 py-1.5 rounded-full font-semibold whitespace-nowrap ${p.estado === 'ACTIVO' ? 'bg-brand/15 text-brand' : 'bg-surface-cardHeader text-muted'}`}
                   >
                     {p.estado}
                   </button>
-                  <button onClick={() => eliminar(p)} className="text-red-400 text-lg leading-none">
+                  <button onClick={() => eliminar(p)} className="text-brand text-lg leading-none">
                     ✕
                   </button>
                 </div>
@@ -218,21 +220,21 @@ function FormularioProducto({
   }
 
   return (
-    <div className="fixed inset-0 bg-ink/40 flex items-end z-20">
-      <div className="bg-surface-card rounded-t-3xl w-full max-w-md mx-auto p-5 flex flex-col gap-4 max-h-[90vh] overflow-y-auto">
-        <h2 className="text-lg font-bold">{productoExistente ? 'Editar producto' : 'Nuevo producto'}</h2>
+    <div className="fixed inset-0 bg-black/60 flex items-end z-20">
+      <div className="bg-surface-card rounded-t-3xl w-full max-w-md mx-auto p-5 flex flex-col gap-4 max-h-[90vh] overflow-y-auto border-t border-surface-border">
+        <h2 className="text-lg font-bold text-paper">{productoExistente ? 'Editar producto' : 'Nuevo producto'}</h2>
         <input
           placeholder="Nombre"
           value={nombre}
           onChange={(e) => setNombre(e.target.value)}
-          className="px-4 py-3 rounded-xl border border-surface-border bg-surface-card"
+          className="px-4 py-3 rounded-xl border border-surface-border bg-surface text-paper placeholder:text-muted"
         />
-        <select value={categoriaId} onChange={(e) => setCategoriaId(e.target.value)} className="px-4 py-3 rounded-xl border border-surface-border bg-surface-card">
+        <select value={categoriaId} onChange={(e) => setCategoriaId(e.target.value)} className="px-4 py-3 rounded-xl border border-surface-border bg-surface text-paper">
           {categorias.map((c) => (
             <option key={c.id} value={c.id}>{c.nombre}</option>
           ))}
         </select>
-        <select value={presentacion} onChange={(e) => setPresentacion(e.target.value as TipoPresentacion)} className="px-4 py-3 rounded-xl border border-surface-border bg-surface-card">
+        <select value={presentacion} onChange={(e) => setPresentacion(e.target.value as TipoPresentacion)} className="px-4 py-3 rounded-xl border border-surface-border bg-surface text-paper">
           {PRESENTACIONES.map((p) => (
             <option key={p} value={p}>{p}</option>
           ))}
@@ -243,13 +245,13 @@ function FormularioProducto({
             placeholder="Unidades por paquete"
             value={unidadesPorPaquete}
             onChange={(e) => setUnidadesPorPaquete(parseInt(e.target.value || '1', 10))}
-            className="px-4 py-3 rounded-xl border border-surface-border bg-surface-card"
+            className="px-4 py-3 rounded-xl border border-surface-border bg-surface text-paper"
           />
         )}
         <div className="flex flex-col gap-2">
-          <p className="text-sm text-ink/60">Ubicaciones</p>
+          <p className="text-sm text-muted">Ubicaciones</p>
           {ubicaciones.map((u) => (
-            <label key={u.id} className="flex items-center gap-2">
+            <label key={u.id} className="flex items-center gap-2 text-paper">
               <input
                 type="checkbox"
                 checked={ubicacionesSel.includes(u.id)}
@@ -264,7 +266,7 @@ function FormularioProducto({
           ))}
         </div>
         <div className="flex gap-3">
-          <button onClick={onCerrar} className="flex-1 py-3 rounded-xl border border-surface-border font-semibold">Cancelar</button>
+          <button onClick={onCerrar} className="flex-1 py-3 rounded-xl border border-surface-border text-paper font-semibold">Cancelar</button>
           <button onClick={guardar} className="flex-1 py-3 rounded-xl bg-brand text-white font-semibold">GUARDAR</button>
         </div>
       </div>

@@ -47,7 +47,7 @@ export default function HistorialPage() {
       });
     } else {
       desde = new Date(hoy);
-      desde.setDate(desde.getDate() - 2); // hoy + 2 días atrás = últimos 3 días
+      desde.setDate(desde.getDate() - 2);
     }
 
     return conteos.filter((c) => new Date(c.fecha) >= desde);
@@ -60,9 +60,9 @@ export default function HistorialPage() {
   };
 
   return (
-    <main className="max-w-md mx-auto p-4 pb-10 flex flex-col gap-4">
+    <main className="max-w-md mx-auto p-4 pb-10 flex flex-col gap-4 min-h-screen bg-surface">
       <div className="flex justify-between items-center">
-        <h1 className="text-xl font-bold">Historial</h1>
+        <h1 className="text-xl font-bold text-paper">Historial</h1>
         <SyncIndicator />
       </div>
 
@@ -71,7 +71,7 @@ export default function HistorialPage() {
           <button
             key={f}
             onClick={() => setFiltro(f)}
-            className={`px-4 py-2 rounded-full text-sm ${filtro === f ? 'bg-brand text-white' : 'bg-surface-card border border-surface-border text-ink'}`}
+            className={`px-4 py-2 rounded-full text-sm ${filtro === f ? 'bg-brand text-white' : 'bg-surface-card border border-surface-border text-slate-300'}`}
           >
             {f === 'HOY' ? 'Hoy' : f === 'AYER' ? 'Ayer' : 'Últimos 3 días'}
           </button>
@@ -80,7 +80,7 @@ export default function HistorialPage() {
 
       <div className="flex flex-col gap-2">
         {conteosFiltrados.length === 0 && (
-          <p className="text-center text-ink/40 py-10">No hay conteos en este rango.</p>
+          <p className="text-center text-muted py-10">No hay conteos en este rango.</p>
         )}
         {conteosFiltrados.map((c) => (
           <button
@@ -89,18 +89,18 @@ export default function HistorialPage() {
             className="text-left bg-surface-card rounded-xl border border-surface-border p-4 flex justify-between items-center"
           >
             <div>
-              <p className="font-medium">
+              <p className="font-medium text-paper">
                 {new Date(c.fecha).toLocaleDateString('es-BO')}{' '}
-                <span className="text-ink/40 font-normal">
+                <span className="text-muted font-normal">
                   {new Date(c.fecha).toLocaleTimeString('es-BO', { hour: '2-digit', minute: '2-digit' })}
                 </span>
               </p>
-              <p className="text-xs text-ink/40">
+              <p className="text-xs text-muted">
                 {c.usuarioNombre} · {c.totalProductos} productos
               </p>
             </div>
             <div className="text-right">
-              <p className="font-bold">{c.totalUnidades} u.</p>
+              <p className="font-bold text-brand">{c.totalUnidades} u.</p>
               <p className="text-xs">{iconoSync[c.estadoSync]}</p>
             </div>
           </button>

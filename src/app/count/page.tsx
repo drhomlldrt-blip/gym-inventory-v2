@@ -5,6 +5,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { useRouter } from 'next/navigation';
 import { db, encolarOperacion } from '@/lib/db';
 import { CantidadesPorUbicacion, Conteo, ItemConteo, calcularTotalItem } from '@/types';
+import { descargarCatalogo } from '@/lib/sync';
 import ProductoConteoCard from '@/components/ProductoConteoCard';
 import SyncIndicator from '@/components/SyncIndicator';
 
@@ -28,6 +29,7 @@ export default function CountPage() {
       return;
     }
     setUsuarioId(id);
+    descargarCatalogo();
   }, [router]);
 
   const productos = useLiveQuery(async () => {
@@ -139,36 +141,36 @@ export default function CountPage() {
     router.push(`/count/resumen/${conteo.id}`);
   }
 
-  if (!usuario) return <div className="p-8 text-center text-ink/40">Cargando...</div>;
+  if (!usuario) return <div className="p-8 text-center text-slate-400">Cargando...</div>;
 
   return (
-    <main className="max-w-md mx-auto pb-32 min-h-screen bg-surface-dark">
-      <header className="sticky top-0 bg-surface-dark/95 backdrop-blur z-10 p-4 flex flex-col gap-3 border-b border-surface-darkBorder">
+    <main className="max-w-md mx-auto pb-32 min-h-screen bg-surface">
+      <header className="sticky top-0 bg-surface/95 backdrop-blur z-10 p-4 flex flex-col gap-3 border-b border-surface-border">
         <div className="flex justify-between items-center">
           <div>
             <h1 className="text-xl font-bold text-white">Inventario</h1>
-            <p className="text-xs text-white/50">{usuario.nombre}</p>
+            <p className="text-xs text-slate-400">{usuario.nombre}</p>
           </div>
           <div className="flex items-center gap-3">
             <button
               onClick={() => router.push('/historial')}
-              className="text-xs text-accent underline"
+              className="text-xs text-slate-400 underline"
             >
               Historial
             </button>
-            <SyncIndicator variant="dark" />
+            <SyncIndicator />
           </div>
         </div>
         <input
           placeholder="Buscar producto..."
           value={busqueda}
           onChange={(e) => setBusqueda(e.target.value)}
-          className="w-full px-4 py-3 rounded-xl border border-surface-darkBorder bg-surface-darkCard text-white placeholder:text-white/40"
+          className="w-full px-4 py-3 rounded-xl border border-surface-border bg-surface-card text-white placeholder:text-slate-500"
         />
         <div className="flex gap-2 overflow-x-auto pb-1">
           <button
             onClick={() => setCategoriaActiva('TODAS')}
-            className={`px-4 py-2 rounded-full text-sm whitespace-nowrap ${categoriaActiva === 'TODAS' ? 'bg-brand text-white' : 'bg-surface-darkCard border border-surface-darkBorder text-white/70'}`}
+            className={`px-4 py-2 rounded-full text-sm whitespace-nowrap ${categoriaActiva === 'TODAS' ? 'bg-brand text-white' : 'bg-surface-card border border-surface-border text-slate-300'}`}
           >
             Todas
           </button>
@@ -176,7 +178,7 @@ export default function CountPage() {
             <button
               key={c.id}
               onClick={() => setCategoriaActiva(c.id)}
-              className={`px-4 py-2 rounded-full text-sm whitespace-nowrap ${categoriaActiva === c.id ? 'bg-brand text-white' : 'bg-surface-darkCard border border-surface-darkBorder text-white/70'}`}
+              className={`px-4 py-2 rounded-full text-sm whitespace-nowrap ${categoriaActiva === c.id ? 'bg-brand text-white' : 'bg-surface-card border border-surface-border text-slate-300'}`}
             >
               {c.nombre}
             </button>
@@ -198,15 +200,15 @@ export default function CountPage() {
           />
         ))}
         {productosFiltrados.length === 0 && (
-          <p className="text-center text-white/40 py-10">No se encontraron productos.</p>
+          <p className="text-center text-slate-500 py-10">No se encontraron productos.</p>
         )}
       </div>
 
-      <div className="fixed bottom-0 left-0 right-0 bg-surface-darkCard border-t border-surface-darkBorder p-4">
+      <div className="fixed bottom-0 left-0 right-0 bg-surface-card border-t border-surface-border p-4">
         <div className="max-w-md mx-auto flex flex-col gap-3">
-          <div className="flex justify-between text-sm text-white/50">
+          <div className="flex justify-between text-sm text-slate-400">
             <span>{productosContados} productos contados</span>
-            <span className="font-semibold text-accent">{totalUnidadesGeneral} unidades</span>
+            <span className="font-semibold text-white">{totalUnidadesGeneral} unidades</span>
           </div>
           <button
             onClick={guardarConteo}

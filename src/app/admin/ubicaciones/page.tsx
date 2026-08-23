@@ -45,9 +45,9 @@ export default function AdminUbicacionesPage() {
   }
 
   return (
-    <main className="max-w-md mx-auto p-4 pb-10 flex flex-col gap-4">
+    <main className="max-w-md mx-auto p-4 pb-10 flex flex-col gap-4 min-h-screen bg-surface">
       <div className="flex justify-between items-center">
-        <h1 className="text-xl font-bold">Ubicaciones</h1>
+        <h1 className="text-xl font-bold text-paper">Ubicaciones</h1>
         <SyncIndicator />
       </div>
 
@@ -56,7 +56,7 @@ export default function AdminUbicacionesPage() {
           placeholder="Nueva ubicación (ej. Almacén)"
           value={nombre}
           onChange={(e) => setNombre(e.target.value)}
-          className="flex-1 px-4 py-3 rounded-xl border border-surface-border bg-surface-card"
+          className="flex-1 px-4 py-3 rounded-xl border border-surface-border bg-surface-card text-paper placeholder:text-muted"
         />
         <button onClick={crear} className="px-4 py-3 rounded-xl bg-brand text-white font-semibold">
           Agregar
@@ -66,14 +66,14 @@ export default function AdminUbicacionesPage() {
       <div className="flex flex-col gap-2">
         {(ubicaciones ?? []).map((u) => (
           <div key={u.id} className="bg-surface-card rounded-xl border border-surface-border p-4 flex justify-between items-center">
-            <span>{u.nombre}</span>
-            <button onClick={() => eliminar(u)} className="text-red-500 text-sm font-medium">
+            <span className="text-paper">{u.nombre}</span>
+            <button onClick={() => eliminar(u)} className="text-brand text-sm font-medium">
               Eliminar
             </button>
           </div>
         ))}
         {(ubicaciones ?? []).length === 0 && (
-          <p className="text-center text-ink/40 py-6">No hay ubicaciones todavía.</p>
+          <p className="text-center text-muted py-6">No hay ubicaciones todavía.</p>
         )}
       </div>
     </main>
