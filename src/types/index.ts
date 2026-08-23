@@ -53,10 +53,20 @@ export interface Producto {
   unidadesPorPaquete: number; // 1 si es tipo UNIDAD (sin empaque)
   ubicacionesHabilitadas: string[]; // ids de Ubicacion
   estado: 'ACTIVO' | 'INACTIVO';
-  orden: number;
+  orden: number; // orden por defecto (fallback si una sucursal no tiene orden propio)
+  ordenPorSucursal?: Record<string, number>; // orden especifico por sucursalId
   sucursalId: string;
   fechaCreacion: string; // ISO
   fechaModificacion: string; // ISO
+}
+
+// Devuelve el orden efectivo de un producto para una sucursal dada:
+// usa el orden especifico de esa sucursal si existe, si no, el general.
+export function ordenEfectivo(producto: Producto, sucursalId: string | null | undefined): number {
+  if (sucursalId && producto.ordenPorSucursal && producto.ordenPorSucursal[sucursalId] !== undefined) {
+    return producto.ordenPorSucursal[sucursalId];
+  }
+  return producto.orden;
 }
 
 // Cantidades sueltas por ubicación, ej: { "ubic_recepcion": 2, "ubic_refri": 3 }

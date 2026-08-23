@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useRouter } from 'next/navigation';
 import { db, encolarOperacion } from '@/lib/db';
-import { CantidadesPorUbicacion, Conteo, ItemConteo, calcularTotalItem } from '@/types';
+import { CantidadesPorUbicacion, Conteo, ItemConteo, calcularTotalItem, ordenEfectivo } from '@/types';
 import { descargarCatalogo } from '@/lib/sync';
 import ProductoConteoCard from '@/components/ProductoConteoCard';
 import SyncIndicator from '@/components/SyncIndicator';
@@ -34,20 +34,25 @@ export default function CountPage() {
 
   const productos = useLiveQuery(async () => {
     const todos = await db.productos.where('estado').equals('ACTIVO').toArray();
-    return todos.sort((a, b) => a.orden - b.orden);
+    return todos;
   });
   const categorias = useLiveQuery(() => db.categorias.toArray());
   const ubicaciones = useLiveQuery(() => db.ubicaciones.toArray());
   const usuario = useLiveQuery(() => (usuarioId ? db.usuarios.get(usuarioId) : undefined), [usuarioId]);
 
-  const productosFiltrados = useMemo(() => {
+  const productosOrdenados = useMemo(() => {
     if (!productos) return [];
-    return productos.filter((p) => {
+    const sucId = usuario?.sucursalId ?? '';
+    return [...productos].sort((a, b) => ordenEfectivo(a, sucId) - ordenEfectivo(b, sucId));
+  }, [productos, usuario]);
+
+  const productosFiltrados = useMemo(() => {
+    return productosOrdenados.filter((p) => {
       const coincideCategoria = categoriaActiva === 'TODAS' || p.categoriaId === categoriaActiva;
       const coincideBusqueda = p.nombre.toLowerCase().includes(busqueda.toLowerCase());
       return coincideCategoria && coincideBusqueda;
     });
-  }, [productos, categoriaActiva, busqueda]);
+  }, [productosOrdenados, categoriaActiva, busqueda]);
 
   function actualizarPaquetes(productoId: string, valor: number) {
     setBorrador((prev) => ({

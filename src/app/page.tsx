@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useRouter } from 'next/navigation';
 import { db } from '@/lib/db';
@@ -8,12 +8,22 @@ import { sembrarDatosSiVacio } from '@/lib/seed';
 import { descargarCatalogo } from '@/lib/sync';
 import SyncIndicator from '@/components/SyncIndicator';
 
+type Paso = 'sucursal' | 'usuario' | 'pin';
+
 export default function LoginPage() {
   const router = useRouter();
   const [listo, setListo] = useState(false);
+  const [paso, setPaso] = useState<Paso>('sucursal');
+  const [sucursalId, setSucursalId] = useState<string | null>(null);
+  const [busqueda, setBusqueda] = useState('');
   const [usuarioSeleccionado, setUsuarioSeleccionado] = useState<string | null>(null);
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
+
+  const sucursales = useLiveQuery(async () => {
+    const todas = await db.sucursales.toArray();
+    return todas.filter((s) => s.activo);
+  });
 
   const usuarios = useLiveQuery(async () => {
     const todos = await db.usuarios.toArray();
@@ -22,16 +32,27 @@ export default function LoginPage() {
 
   useEffect(() => {
     async function iniciar() {
-      // Si hay internet y Firebase configurado, primero intenta traer
-      // el catalogo real (lo que el administrador creo/edito en otro
-      // dispositivo). Si no hay internet o no hay datos aun en la nube,
-      // sigue funcionando con lo que ya tenga guardado localmente.
       await descargarCatalogo();
       await sembrarDatosSiVacio();
       setListo(true);
     }
     iniciar();
   }, []);
+
+  // Si solo hay una sucursal activa, nos saltamos ese paso.
+  useEffect(() => {
+    if (sucursales && sucursales.length === 1 && paso === 'sucursal') {
+      setSucursalId(sucursales[0].id);
+      setPaso('usuario');
+    }
+  }, [sucursales, paso]);
+
+  const usuariosDeSucursal = useMemo(() => {
+    if (!usuarios) return [];
+    return usuarios
+      .filter((u) => !sucursalId || u.sucursalId === sucursalId)
+      .filter((u) => u.nombre.toLowerCase().includes(busqueda.toLowerCase()));
+  }, [usuarios, sucursalId, busqueda]);
 
   async function ingresar() {
     if (!usuarioSeleccionado) return;
@@ -59,24 +80,72 @@ export default function LoginPage() {
         <SyncIndicator />
       </div>
 
-      {!usuarioSeleccionado ? (
+      {paso === 'sucursal' && (
         <div className="flex flex-col gap-3">
-          <p className="text-muted">¿Quién está realizando el conteo?</p>
-          {(usuarios ?? []).map((u) => (
+          <p className="text-muted">¿En qué sucursal estás?</p>
+          {(sucursales ?? []).map((s) => (
+            <button
+              key={s.id}
+              onClick={() => {
+                setSucursalId(s.id);
+                setPaso('usuario');
+              }}
+              className="w-full text-left px-5 py-4 rounded-2xl bg-surface-card border border-surface-border text-lg font-medium text-paper active:scale-[0.98] transition"
+            >
+              {s.nombre}
+            </button>
+          ))}
+          {(sucursales ?? []).length === 0 && (
+            <p className="text-center text-muted py-6">No hay sucursales cargadas todavía.</p>
+          )}
+        </div>
+      )}
+
+      {paso === 'usuario' && (
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center justify-between">
+            <p className="text-muted">¿Quién está realizando el conteo?</p>
+            {(sucursales ?? []).length > 1 && (
+              <button
+                onClick={() => {
+                  setSucursalId(null);
+                  setBusqueda('');
+                  setPaso('sucursal');
+                }}
+                className="text-xs text-muted underline"
+              >
+                Cambiar sucursal
+              </button>
+            )}
+          </div>
+          {(sucursales ?? []).length > 1 && (
+            <input
+              placeholder="Buscar por nombre..."
+              value={busqueda}
+              onChange={(e) => setBusqueda(e.target.value)}
+              className="w-full px-4 py-3 rounded-xl border border-surface-border bg-surface-card text-paper placeholder:text-muted"
+            />
+          )}
+          {usuariosDeSucursal.map((u) => (
             <button
               key={u.id}
-              onClick={() => setUsuarioSeleccionado(u.id)}
+              onClick={() => {
+                setUsuarioSeleccionado(u.id);
+                setPaso('pin');
+              }}
               className="w-full text-left px-5 py-4 rounded-2xl bg-surface-card border border-surface-border text-lg font-medium text-paper active:scale-[0.98] transition"
             >
               {u.nombre}
               <span className="block text-xs text-muted font-normal">{u.rol}</span>
             </button>
           ))}
-          {(usuarios ?? []).length === 0 && (
-            <p className="text-center text-muted py-6">No hay usuarios cargados todavía.</p>
+          {usuariosDeSucursal.length === 0 && (
+            <p className="text-center text-muted py-6">No se encontraron usuarios.</p>
           )}
         </div>
-      ) : (
+      )}
+
+      {paso === 'pin' && (
         <div className="flex flex-col gap-4">
           <p className="text-muted">Ingresa tu PIN</p>
           <input
@@ -104,6 +173,7 @@ export default function LoginPage() {
               setUsuarioSeleccionado(null);
               setPin('');
               setError('');
+              setPaso('usuario');
             }}
             className="text-muted text-sm"
           >

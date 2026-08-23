@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useRouter } from 'next/navigation';
 import { db, encolarOperacion } from '@/lib/db';
-import { Producto, TipoPresentacion } from '@/types';
+import { Producto, TipoPresentacion, ordenEfectivo } from '@/types';
 import { descargarCatalogo } from '@/lib/sync';
 import SyncIndicator from '@/components/SyncIndicator';
 
@@ -14,13 +14,15 @@ export default function AdminProductosPage() {
   const router = useRouter();
   const [creando, setCreando] = useState(false);
   const [editando, setEditando] = useState<Producto | null>(null);
-  const productos = useLiveQuery(async () => {
-    const todos = await db.productos.toArray();
-    return todos.sort((a, b) => a.orden - b.orden);
-  });
+  // null = orden general (por defecto). Si se elige una sucursal, el
+  // orden que se mueva con las flechas aplica SOLO a esa sucursal.
+  const [sucursalOrdenando, setSucursalOrdenando] = useState<string | null>(null);
+
+  const productos = useLiveQuery(async () => db.productos.toArray());
   const categorias = useLiveQuery(() => db.categorias.toArray());
   const ubicaciones = useLiveQuery(() => db.ubicaciones.toArray());
   const conteos = useLiveQuery(() => db.conteos.toArray());
+  const sucursales = useLiveQuery(() => db.sucursales.toArray());
 
   useEffect(() => {
     const id = sessionStorage.getItem('usuarioActivoId');
@@ -55,15 +57,36 @@ export default function AdminProductosPage() {
     if (!productos) return;
     const listaCategoria = productos
       .filter((x) => x.categoriaId === p.categoriaId)
-      .sort((a, b) => a.orden - b.orden);
+      .sort((a, b) => ordenEfectivo(a, sucursalOrdenando) - ordenEfectivo(b, sucursalOrdenando));
     const idx = listaCategoria.findIndex((x) => x.id === p.id);
     const idxVecino = direccion === 'subir' ? idx - 1 : idx + 1;
     if (idxVecino < 0 || idxVecino >= listaCategoria.length) return;
 
     const vecino = listaCategoria[idxVecino];
     const ahora = new Date().toISOString();
-    const pActualizado = { ...p, orden: vecino.orden, fechaModificacion: ahora };
-    const vecinoActualizado = { ...vecino, orden: p.orden, fechaModificacion: ahora };
+    const ordenP = ordenEfectivo(p, sucursalOrdenando);
+    const ordenVecino = ordenEfectivo(vecino, sucursalOrdenando);
+
+    let pActualizado: Producto;
+    let vecinoActualizado: Producto;
+
+    if (sucursalOrdenando) {
+      // Solo afecta el orden de esta sucursal, sin tocar el orden general
+      // ni el de las demas sucursales.
+      pActualizado = {
+        ...p,
+        ordenPorSucursal: { ...(p.ordenPorSucursal ?? {}), [sucursalOrdenando]: ordenVecino },
+        fechaModificacion: ahora,
+      };
+      vecinoActualizado = {
+        ...vecino,
+        ordenPorSucursal: { ...(vecino.ordenPorSucursal ?? {}), [sucursalOrdenando]: ordenP },
+        fechaModificacion: ahora,
+      };
+    } else {
+      pActualizado = { ...p, orden: ordenVecino, fechaModificacion: ahora };
+      vecinoActualizado = { ...vecino, orden: ordenP, fechaModificacion: ahora };
+    }
 
     await db.productos.put(pActualizado);
     await db.productos.put(vecinoActualizado);
@@ -97,11 +120,39 @@ export default function AdminProductosPage() {
         + NUEVO PRODUCTO
       </button>
 
+      {(sucursales ?? []).length > 0 && (
+        <div className="flex flex-col gap-2">
+          <p className="text-sm text-muted">Ordenando para:</p>
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            <button
+              onClick={() => setSucursalOrdenando(null)}
+              className={`px-4 py-2 rounded-full text-sm whitespace-nowrap ${sucursalOrdenando === null ? 'bg-brand text-white' : 'bg-surface-card border border-surface-border text-slate-300'}`}
+            >
+              General (por defecto)
+            </button>
+            {(sucursales ?? []).map((s) => (
+              <button
+                key={s.id}
+                onClick={() => setSucursalOrdenando(s.id)}
+                className={`px-4 py-2 rounded-full text-sm whitespace-nowrap ${sucursalOrdenando === s.id ? 'bg-brand text-white' : 'bg-surface-card border border-surface-border text-slate-300'}`}
+              >
+                {s.nombre}
+              </button>
+            ))}
+          </div>
+          {sucursalOrdenando && (
+            <p className="text-xs text-muted">
+              Las flechas ahora mueven el orden solo para esta sucursal. Las demás no se ven afectadas.
+            </p>
+          )}
+        </div>
+      )}
+
       <div className="flex flex-col gap-5">
         {(categorias ?? []).map((cat) => {
           const productosCategoria = (productos ?? [])
             .filter((p) => p.categoriaId === cat.id)
-            .sort((a, b) => a.orden - b.orden);
+            .sort((a, b) => ordenEfectivo(a, sucursalOrdenando) - ordenEfectivo(b, sucursalOrdenando));
           if (productosCategoria.length === 0) return null;
           return (
             <div key={cat.id} className="flex flex-col gap-2">
