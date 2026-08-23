@@ -16,12 +16,12 @@ export function asegurarAutenticacion(): Promise<void> {
   if (promesaListo) return promesaListo;
 
   promesaListo = new Promise((resolve) => {
-    const cancelar = onAuthStateChanged(auth, (usuario) => {
+    const cancelar = onAuthStateChanged(auth!, (usuario) => {
       if (usuario) {
         cancelar();
         resolve();
       } else {
-        signInAnonymously(auth).catch((err) => {
+        signInAnonymously(auth!).catch((err) => {
           console.warn('No se pudo autenticar de forma anónima con Firebase:', err);
           resolve(); // no bloquear la app aunque falle
         });

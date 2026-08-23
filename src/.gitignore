@@ -1,0 +1,18 @@
+# dependencias
+/node_modules
+
+# build de Next.js
+/.next/
+/out/
+
+# archivos de entorno con datos sensibles
+.env
+.env.local
+.env*.local
+
+# sistema
+.DS_Store
+Thumbs.db
+
+# logs
+npm-debug.log*
