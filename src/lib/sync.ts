@@ -21,6 +21,7 @@ const COLECCION_POR_TIPO: Record<string, string> = {
   CATEGORIA: 'categorias',
   UBICACION: 'ubicaciones',
   USUARIO: 'usuarios',
+  SUCURSAL: 'sucursales',
 };
 
 // Tablas "maestras" que se descargan de Firestore a cada dispositivo.

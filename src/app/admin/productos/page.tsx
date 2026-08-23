@@ -78,12 +78,15 @@ export default function AdminProductosPage() {
         <SyncIndicator />
       </div>
 
-      <div className="flex gap-3 text-sm">
+      <div className="flex gap-3 text-sm flex-wrap">
         <button onClick={() => router.push('/historial')} className="text-muted underline">
           Historial de conteos →
         </button>
         <button onClick={() => router.push('/admin/ubicaciones')} className="text-muted underline">
           Gestionar ubicaciones →
+        </button>
+        <button onClick={() => router.push('/admin/usuarios')} className="text-muted underline">
+          Gestionar usuarios →
         </button>
       </div>
 
