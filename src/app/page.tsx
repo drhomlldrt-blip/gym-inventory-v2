@@ -27,7 +27,7 @@ export default function LoginPage() {
     if (!usuarioSeleccionado) return;
     const usuario = await db.usuarios.get(usuarioSeleccionado);
     if (!usuario || usuario.pin !== pin) {
-      setError('PIN incorrecto');
+      setError('Contraseña incorrecta');
       return;
     }
     sessionStorage.setItem('usuarioActivoId', usuario.id);
@@ -67,19 +67,17 @@ export default function LoginPage() {
         </div>
       ) : (
         <div className="flex flex-col gap-4">
-          <p className="text-ink/60">Ingresa tu PIN</p>
+          <p className="text-ink/60">Ingresa tu contraseña</p>
           <input
             autoFocus
             type="password"
-            inputMode="numeric"
-            pattern="[0-9]*"
             value={pin}
             onChange={(e) => {
-              setPin(e.target.value.replace(/[^0-9]/g, ''));
+              setPin(e.target.value);
               setError('');
             }}
-            className="text-center text-3xl tracking-[0.5em] py-4 rounded-2xl border border-surface-border bg-surface-card"
-            maxLength={6}
+            className="text-center text-2xl tracking-widest py-4 rounded-2xl border border-surface-border bg-surface-card"
+            maxLength={32}
           />
           {error && <p className="text-red-500 text-sm text-center">{error}</p>}
           <button

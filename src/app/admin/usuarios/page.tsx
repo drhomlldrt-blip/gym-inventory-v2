@@ -7,25 +7,6 @@ import { db, encolarOperacion } from '@/lib/db';
 import { Usuario, Rol, Sucursal } from '@/types';
 import SyncIndicator from '@/components/SyncIndicator';
 
-// Genera un identificador interno único a partir del nombre (no lo escribe el admin ni lo usa la recepcionista para entrar).
-function generarUsuario(nombre: string, existentes: Usuario[], excluirId?: string) {
-  const base =
-    nombre
-      .trim()
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .replace(/[^a-z0-9]+/g, '_')
-      .replace(/^_+|_+$/g, '') || 'usuario';
-  let candidato = base;
-  let i = 2;
-  while (existentes.some((u) => u.usuario === candidato && u.id !== excluirId)) {
-    candidato = `${base}_${i}`;
-    i++;
-  }
-  return candidato;
-}
-
 export default function AdminUsuariosPage() {
   const router = useRouter();
   const [creando, setCreando] = useState(false);
@@ -69,6 +50,7 @@ export default function AdminUsuariosPage() {
   }
 
   const sucursalesActivas = (sucursales ?? []).filter((s) => s.activo);
+  const sucursalesPorId = Object.fromEntries((sucursales ?? []).map((s) => [s.id, s.nombre]));
 
   return (
     <main className="max-w-md mx-auto p-4 pb-10 flex flex-col gap-4">
@@ -120,7 +102,7 @@ export default function AdminUsuariosPage() {
                         </span>
                       )}
                     </p>
-                    <p className="text-xs text-ink/40">PIN: {u.pin}</p>
+                    <p className="text-xs text-ink/40">@{u.usuario}</p>
                   </button>
                   <button
                     onClick={() => alternarActivo(u)}
@@ -170,18 +152,27 @@ function FormularioUsuario({
   onCerrar: () => void;
 }) {
   const [nombre, setNombre] = useState(usuarioExistente?.nombre ?? '');
-  const [pin, setPin] = useState(usuarioExistente?.pin ?? '');
+  const [usuario, setUsuario] = useState(usuarioExistente?.usuario ?? '');
+  const [contrasena, setContrasena] = useState(usuarioExistente?.pin ?? '');
   const [rol, setRol] = useState<Rol>(usuarioExistente?.rol ?? 'RECEPCIONISTA');
   const [sucursalId, setSucursalId] = useState(usuarioExistente?.sucursalId ?? sucursales[0]?.id ?? '');
   const [error, setError] = useState('');
 
   async function guardar() {
-    if (!nombre.trim() || !pin.trim()) {
-      setError('Completa nombre y PIN.');
+    if (!nombre.trim() || !usuario.trim() || !contrasena.trim()) {
+      setError('Completa nombre, usuario y contraseña.');
       return;
     }
-    if (pin.trim().length < 4) {
-      setError('El PIN debe tener al menos 4 dígitos.');
+    if (contrasena.trim().length < 4) {
+      setError('La contraseña debe tener al menos 4 caracteres.');
+      return;
+    }
+    const usuarioNormalizado = usuario.trim().toLowerCase().replace(/\s+/g, '');
+    const duplicado = usuariosExistentes.some(
+      (u) => u.usuario.toLowerCase() === usuarioNormalizado && u.id !== usuarioExistente?.id
+    );
+    if (duplicado) {
+      setError('Ese nombre de usuario ya está en uso.');
       return;
     }
 
@@ -189,7 +180,8 @@ function FormularioUsuario({
       const actualizado: Usuario = {
         ...usuarioExistente,
         nombre: nombre.trim(),
-        pin: pin.trim(),
+        usuario: usuarioNormalizado,
+        pin: contrasena.trim(),
         rol,
         sucursalId,
       };
@@ -199,8 +191,8 @@ function FormularioUsuario({
       const nuevo: Usuario = {
         id: `user_${Date.now()}`,
         nombre: nombre.trim(),
-        usuario: generarUsuario(nombre, usuariosExistentes),
-        pin: pin.trim(),
+        usuario: usuarioNormalizado,
+        pin: contrasena.trim(),
         rol,
         sucursalId,
         activo: true,
@@ -227,15 +219,23 @@ function FormularioUsuario({
         </div>
 
         <div className="flex flex-col gap-1">
-          <label className="text-xs text-ink/60">PIN</label>
+          <label className="text-xs text-ink/60">Usuario (para iniciar sesión)</label>
+          <input
+            placeholder="Ej. camila"
+            autoCapitalize="none"
+            value={usuario}
+            onChange={(e) => setUsuario(e.target.value)}
+            className="px-4 py-3 rounded-xl border border-surface-border bg-surface-card"
+          />
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <label className="text-xs text-ink/60">Contraseña</label>
           <input
             type="text"
-            inputMode="numeric"
-            pattern="[0-9]*"
-            placeholder="Ej. 1234"
-            value={pin}
-            onChange={(e) => setPin(e.target.value.replace(/[^0-9]/g, ''))}
-            maxLength={6}
+            placeholder="Mínimo 4 caracteres"
+            value={contrasena}
+            onChange={(e) => setContrasena(e.target.value)}
             className="px-4 py-3 rounded-xl border border-surface-border bg-surface-card"
           />
         </div>
