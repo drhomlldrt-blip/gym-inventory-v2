@@ -1,24 +1,19 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { useRouter } from 'next/navigation';
 import { db, encolarOperacion } from '@/lib/db';
 import { Sucursal, Usuario, Rol } from '@/types';
+import { useRequiereAdmin } from '@/lib/useRequiereAdmin';
 import SyncIndicator from '@/components/SyncIndicator';
 
 export default function AdminSucursalesPage() {
-  const router = useRouter();
+  useRequiereAdmin();
   const [nombre, setNombre] = useState('');
   const [expandida, setExpandida] = useState<string | null>(null);
   const [agregandoUsuarioEn, setAgregandoUsuarioEn] = useState<string | null>(null);
   const sucursales = useLiveQuery(() => db.sucursales.toArray());
   const usuarios = useLiveQuery(() => db.usuarios.toArray());
-
-  useEffect(() => {
-    const id = sessionStorage.getItem('usuarioActivoId');
-    if (!id) router.push('/');
-  }, [router]);
 
   async function crear() {
     if (!nombre.trim()) return;

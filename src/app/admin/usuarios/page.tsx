@@ -1,25 +1,20 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { useRouter } from 'next/navigation';
 import { db, encolarOperacion } from '@/lib/db';
 import { Usuario, Rol } from '@/types';
+import { useRequiereAdmin } from '@/lib/useRequiereAdmin';
 import SyncIndicator from '@/components/SyncIndicator';
 
 export default function AdminUsuariosPage() {
-  const router = useRouter();
+  useRequiereAdmin();
   const [creando, setCreando] = useState(false);
   const [busqueda, setBusqueda] = useState('');
   const [sucursalFiltro, setSucursalFiltro] = useState<string | 'TODAS'>('TODAS');
   const usuarios = useLiveQuery(() => db.usuarios.toArray());
   const sucursales = useLiveQuery(() => db.sucursales.toArray());
   const conteos = useLiveQuery(() => db.conteos.toArray());
-
-  useEffect(() => {
-    const id = sessionStorage.getItem('usuarioActivoId');
-    if (!id) router.push('/');
-  }, [router]);
 
   async function alternarActivo(u: Usuario) {
     const actualizado = { ...u, activo: !u.activo };

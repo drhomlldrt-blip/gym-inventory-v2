@@ -1,22 +1,17 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { useRouter } from 'next/navigation';
 import { db, encolarOperacion } from '@/lib/db';
 import { Ubicacion } from '@/types';
+import { useRequiereAdmin } from '@/lib/useRequiereAdmin';
 import SyncIndicator from '@/components/SyncIndicator';
 
 export default function AdminUbicacionesPage() {
-  const router = useRouter();
+  useRequiereAdmin();
   const [nombre, setNombre] = useState('');
   const ubicaciones = useLiveQuery(() => db.ubicaciones.toArray());
   const productos = useLiveQuery(() => db.productos.toArray());
-
-  useEffect(() => {
-    const id = sessionStorage.getItem('usuarioActivoId');
-    if (!id) router.push('/');
-  }, [router]);
 
   async function crear() {
     if (!nombre.trim()) return;
