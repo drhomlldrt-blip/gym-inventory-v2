@@ -1,17 +1,11 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useRouter } from 'next/navigation';
 import { db } from '@/lib/db';
 import { sembrarDatosSiVacio } from '@/lib/seed';
 import { descargarCatalogo } from '@/lib/sync';
-import {
-  ModoDispositivo,
-  obtenerModoDispositivo,
-  establecerModoDispositivo,
-  restablecerModoDispositivo,
-} from '@/lib/deviceMode';
 import SyncIndicator from '@/components/SyncIndicator';
 
 type Paso = 'sucursal' | 'usuario' | 'pin';
@@ -19,15 +13,12 @@ type Paso = 'sucursal' | 'usuario' | 'pin';
 export default function LoginPage() {
   const router = useRouter();
   const [listo, setListo] = useState(false);
-  const [modo, setModo] = useState<ModoDispositivo | null>(null);
   const [paso, setPaso] = useState<Paso>('sucursal');
   const [sucursalId, setSucursalId] = useState<string | null>(null);
   const [busqueda, setBusqueda] = useState('');
   const [usuarioSeleccionado, setUsuarioSeleccionado] = useState<string | null>(null);
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
-  const tapsRef = useRef(0);
-  const tapsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const sucursales = useLiveQuery(async () => {
     const todas = await db.sucursales.toArray();
@@ -43,7 +34,6 @@ export default function LoginPage() {
     async function iniciar() {
       await descargarCatalogo();
       await sembrarDatosSiVacio();
-      setModo(obtenerModoDispositivo());
       setListo(true);
     }
     iniciar();
@@ -57,30 +47,18 @@ export default function LoginPage() {
     }
   }, [sucursales, paso]);
 
-  // En dispositivos de recepción, nunca se muestran cuentas de administrador:
-  // ni siquiera aparecen en la lista para intentar entrar con ellas.
-  const usuariosVisibles = useMemo(() => {
-    if (!usuarios) return [];
-    if (modo === 'RECEPCION') return usuarios.filter((u) => u.rol === 'RECEPCIONISTA');
-    return usuarios;
-  }, [usuarios, modo]);
-
   const usuariosDeSucursal = useMemo(() => {
-    return usuariosVisibles
+    if (!usuarios) return [];
+    return usuarios
       .filter((u) => !sucursalId || u.sucursalId === sucursalId)
       .filter((u) => u.nombre.toLowerCase().includes(busqueda.toLowerCase()));
-  }, [usuariosVisibles, sucursalId, busqueda]);
+  }, [usuarios, sucursalId, busqueda]);
 
   async function ingresar() {
     if (!usuarioSeleccionado) return;
     const usuario = await db.usuarios.get(usuarioSeleccionado);
     if (!usuario || usuario.pin !== pin) {
       setError('PIN incorrecto');
-      return;
-    }
-    if (modo === 'RECEPCION' && usuario.rol === 'ADMINISTRADOR') {
-      // Defensa extra por si el dato quedó en la lista por alguna sincronización a medias.
-      setError('Este dispositivo es solo para recepción.');
       return;
     }
     sessionStorage.setItem('usuarioActivoId', usuario.id);
@@ -91,55 +69,14 @@ export default function LoginPage() {
     }
   }
 
-  // Gesto oculto: tocar el título 5 veces pide el PIN de un administrador
-  // para reconfigurar el modo de este dispositivo (por si te equivocaste).
-  function tocarTitulo() {
-    tapsRef.current += 1;
-    if (tapsTimeoutRef.current) clearTimeout(tapsTimeoutRef.current);
-    tapsTimeoutRef.current = setTimeout(() => {
-      tapsRef.current = 0;
-    }, 1500);
-
-    if (tapsRef.current >= 5) {
-      tapsRef.current = 0;
-      const intento = window.prompt('PIN de administrador para reconfigurar este dispositivo:');
-      if (!intento) return;
-      db.usuarios
-        .where('rol')
-        .equals('ADMINISTRADOR')
-        .toArray()
-        .then((admins) => {
-          if (admins.some((a) => a.pin === intento && a.activo)) {
-            restablecerModoDispositivo();
-            setModo(null);
-          } else {
-            window.alert('PIN incorrecto.');
-          }
-        });
-    }
-  }
-
   if (!listo) {
     return <div className="p-8 text-center text-muted">Cargando...</div>;
-  }
-
-  if (modo === null) {
-    return (
-      <ConfiguracionDispositivo
-        onElegir={(m) => {
-          establecerModoDispositivo(m);
-          setModo(m);
-        }}
-      />
-    );
   }
 
   return (
     <main className="max-w-sm mx-auto p-6 pt-16 flex flex-col gap-6 min-h-screen">
       <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold text-paper select-none" onClick={tocarTitulo}>
-          Inventario
-        </h1>
+        <h1 className="text-2xl font-bold text-paper">Inventario</h1>
         <SyncIndicator />
       </div>
 
@@ -199,11 +136,7 @@ export default function LoginPage() {
               className="w-full text-left px-5 py-4 rounded-2xl bg-surface-card border border-surface-border text-lg font-medium text-paper active:scale-[0.98] transition"
             >
               {u.nombre}
-              {modo === 'ADMIN' && (
-                <span className="block text-xs text-muted font-normal">
-                  {u.rol === 'ADMINISTRADOR' ? 'Administrador' : 'Recepcionista'}
-                </span>
-              )}
+              <span className="block text-xs text-muted font-normal">{u.rol}</span>
             </button>
           ))}
           {usuariosDeSucursal.length === 0 && (
@@ -222,7 +155,7 @@ export default function LoginPage() {
             pattern="[0-9]*"
             value={pin}
             onChange={(e) => {
-              setPin(e.target.value.replace(/[^0-9]/g, ''));
+              setPin(e.target.value);
               setError('');
             }}
             className="text-center text-3xl tracking-[0.5em] py-4 rounded-2xl border border-surface-border bg-surface-card text-paper"
@@ -248,41 +181,6 @@ export default function LoginPage() {
           </button>
         </div>
       )}
-    </main>
-  );
-}
-
-// Se muestra una sola vez por dispositivo (queda guardado en este navegador).
-function ConfiguracionDispositivo({ onElegir }: { onElegir: (modo: ModoDispositivo) => void }) {
-  return (
-    <main className="max-w-sm mx-auto p-6 pt-20 flex flex-col gap-6 min-h-screen">
-      <div>
-        <h1 className="text-2xl font-bold text-paper">¿Qué es este dispositivo?</h1>
-        <p className="text-muted mt-2">
-          Se configura una sola vez. Puedes cambiarlo después tocando el título 5 veces y
-          escribiendo un PIN de administrador.
-        </p>
-      </div>
-
-      <button
-        onClick={() => onElegir('RECEPCION')}
-        className="w-full text-left px-5 py-4 rounded-2xl bg-surface-card border border-surface-border active:scale-[0.98] transition"
-      >
-        <p className="text-lg font-medium text-paper">Celular de recepción</p>
-        <p className="text-xs text-muted mt-1">
-          Para las recepcionistas. Solo verán su propia cuenta, nunca la de administración.
-        </p>
-      </button>
-
-      <button
-        onClick={() => onElegir('ADMIN')}
-        className="w-full text-left px-5 py-4 rounded-2xl bg-brand/15 border border-brand/40 active:scale-[0.98] transition"
-      >
-        <p className="text-lg font-medium text-brand">Mi dispositivo (administración)</p>
-        <p className="text-xs text-muted mt-1">
-          Tu computadora o tu celular personal. Acceso completo para crear y administrar.
-        </p>
-      </button>
     </main>
   );
 }

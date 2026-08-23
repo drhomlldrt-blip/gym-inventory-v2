@@ -4,13 +4,12 @@ import { useEffect, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useRouter } from 'next/navigation';
 import { db, encolarOperacion } from '@/lib/db';
-import { Producto, ordenEfectivo } from '@/types';
+import { Producto, TipoPresentacion, ordenEfectivo, TipoEmpaque } from '@/types';
 import { descargarCatalogo } from '@/lib/sync';
-import { useRequiereAdmin } from '@/lib/useRequiereAdmin';
+import { verificarEsAdmin } from '@/lib/auth-guard';
 import SyncIndicator from '@/components/SyncIndicator';
 
 export default function AdminProductosPage() {
-  useRequiereAdmin();
   const router = useRouter();
   const [creando, setCreando] = useState(false);
   const [editando, setEditando] = useState<Producto | null>(null);
@@ -23,12 +22,16 @@ export default function AdminProductosPage() {
   const ubicaciones = useLiveQuery(() => db.ubicaciones.toArray());
   const conteos = useLiveQuery(() => db.conteos.toArray());
   const sucursales = useLiveQuery(() => db.sucursales.toArray());
-  const tipos = useLiveQuery(async () => (await db.tiposPresentacion.toArray()).filter((t) => t.activo));
-  const mapaTipos = Object.fromEntries((tipos ?? []).map((t) => [t.id, t.nombre]));
+  const tiposEmpaque = useLiveQuery(async () => {
+    const todos = await db.tiposEmpaque.toArray();
+    return todos.filter((t) => t.activo);
+  });
 
   useEffect(() => {
-    descargarCatalogo();
-  }, []);
+    verificarEsAdmin(router).then((esAdmin) => {
+      if (esAdmin) descargarCatalogo();
+    });
+  }, [router]);
 
   async function alternarActivo(p: Producto) {
     const nuevoEstado = p.estado === 'ACTIVO' ? 'INACTIVO' : 'ACTIVO';
@@ -108,8 +111,8 @@ export default function AdminProductosPage() {
         <button onClick={() => router.push('/admin/usuarios')} className="text-muted underline">
           Gestionar usuarios →
         </button>
-        <button onClick={() => router.push('/admin/tipos-presentacion')} className="text-muted underline">
-          Tipos de empaque →
+        <button onClick={() => router.push('/admin/tipos-empaque')} className="text-muted underline">
+          Gestionar tipos de empaque →
         </button>
       </div>
 
@@ -178,7 +181,7 @@ export default function AdminProductosPage() {
                   <button className="text-left flex-1" onClick={() => setEditando(p)}>
                     <p className="font-medium text-paper">{p.nombre}</p>
                     <p className="text-xs text-muted">
-                      {p.tipoPresentacion === 'UNIDAD' ? 'Solo por unidad' : `${p.unidadesPorPaquete} u/${(mapaTipos[p.tipoPresentacion] ?? p.tipoPresentacion).toLowerCase()}`}
+                      {p.tipoPresentacion === 'UNIDAD' ? 'Solo por unidad' : `${p.unidadesPorPaquete} u/${p.tipoPresentacion.toLowerCase()}`}
                     </p>
                   </button>
                   <button
@@ -201,6 +204,7 @@ export default function AdminProductosPage() {
         <FormularioProducto
           categorias={categorias ?? []}
           ubicaciones={ubicaciones ?? []}
+          tiposEmpaque={tiposEmpaque ?? []}
           onCerrar={() => setCreando(false)}
         />
       )}
@@ -210,6 +214,7 @@ export default function AdminProductosPage() {
           productoExistente={editando}
           categorias={categorias ?? []}
           ubicaciones={ubicaciones ?? []}
+          tiposEmpaque={tiposEmpaque ?? []}
           onCerrar={() => setEditando(null)}
         />
       )}
@@ -221,17 +226,20 @@ function FormularioProducto({
   productoExistente,
   categorias,
   ubicaciones,
+  tiposEmpaque,
   onCerrar,
 }: {
   productoExistente?: Producto;
   categorias: { id: string; nombre: string }[];
   ubicaciones: { id: string; nombre: string }[];
+  tiposEmpaque: TipoEmpaque[];
   onCerrar: () => void;
 }) {
   const [nombre, setNombre] = useState(productoExistente?.nombre ?? '');
   const [categoriaId, setCategoriaId] = useState(productoExistente?.categoriaId ?? categorias[0]?.id ?? '');
-  const tipos = useLiveQuery(async () => (await db.tiposPresentacion.toArray()).filter((t) => t.activo));
-  const [presentacion, setPresentacion] = useState<string>(productoExistente?.tipoPresentacion ?? 'PAQUETE');
+  const [presentacion, setPresentacion] = useState<TipoPresentacion>(
+    productoExistente?.tipoPresentacion ?? tiposEmpaque[0]?.nombre ?? 'Paquete'
+  );
   const [unidadesPorPaquete, setUnidadesPorPaquete] = useState(productoExistente?.unidadesPorPaquete ?? 1);
   const [ubicacionesSel, setUbicacionesSel] = useState<string[]>(
     productoExistente?.ubicacionesHabilitadas ?? ubicaciones.map((u) => u.id)
@@ -289,11 +297,18 @@ function FormularioProducto({
             <option key={c.id} value={c.id}>{c.nombre}</option>
           ))}
         </select>
-        <select value={presentacion} onChange={(e) => setPresentacion(e.target.value)} className="px-4 py-3 rounded-xl border border-surface-border bg-surface text-paper">
-          {(tipos ?? []).map((t) => (
-            <option key={t.id} value={t.id}>{t.nombre}</option>
+        <select value={presentacion} onChange={(e) => setPresentacion(e.target.value as TipoPresentacion)} className="px-4 py-3 rounded-xl border border-surface-border bg-surface text-paper">
+          {tiposEmpaque.map((t) => (
+            <option key={t.id} value={t.nombre}>{t.nombre}</option>
           ))}
+          <option value="UNIDAD">Solo por unidad (sin paquete)</option>
         </select>
+        {tiposEmpaque.length === 0 && (
+          <p className="text-xs text-muted -mt-2">
+            No hay tipos de empaque creados todavía.{' '}
+            <a href="/admin/tipos-empaque" className="underline text-brand">Crear uno aquí</a>.
+          </p>
+        )}
         {presentacion !== 'UNIDAD' && (
           <input
             type="number"

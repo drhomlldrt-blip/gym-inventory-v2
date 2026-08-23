@@ -7,7 +7,7 @@ import {
   Usuario,
   Conteo,
   OperacionSync,
-  TipoPresentacionItem,
+  TipoEmpaque,
 } from '@/types';
 
 // ==========================================================
@@ -23,7 +23,7 @@ export class InventarioDB extends Dexie {
   usuarios!: Table<Usuario, string>;
   conteos!: Table<Conteo, string>;
   syncQueue!: Table<OperacionSync, string>;
-  tiposPresentacion!: Table<TipoPresentacionItem, string>;
+  tiposEmpaque!: Table<TipoEmpaque, string>;
 
   constructor() {
     super('gym_inventario_db');
@@ -36,7 +36,7 @@ export class InventarioDB extends Dexie {
       conteos: 'id, fecha, usuarioId, sucursalId, estadoSync, finalizado',
       syncQueue: 'id, estado, tipo, fechaCreacion',
     });
-    // v2: agrega catálogo editable de tipos de presentación (paquete/caja/otros).
+    // v2: agrega tabla de tipos de empaque configurables (Paquete, Caja, etc.)
     this.version(2).stores({
       productos: 'id, categoriaId, sucursalId, estado, orden',
       categorias: 'id, orden',
@@ -45,7 +45,7 @@ export class InventarioDB extends Dexie {
       usuarios: 'id, usuario, sucursalId',
       conteos: 'id, fecha, usuarioId, sucursalId, estadoSync, finalizado',
       syncQueue: 'id, estado, tipo, fechaCreacion',
-      tiposPresentacion: 'id',
+      tiposEmpaque: 'id, nombre',
     });
   }
 }

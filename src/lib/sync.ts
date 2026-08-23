@@ -22,19 +22,20 @@ const COLECCION_POR_TIPO: Record<string, string> = {
   UBICACION: 'ubicaciones',
   USUARIO: 'usuarios',
   SUCURSAL: 'sucursales',
-  TIPO_PRESENTACION: 'tiposPresentacion',
+  TIPO_EMPAQUE: 'tiposEmpaque',
 };
 
 // Tablas "maestras" que se descargan de Firestore a cada dispositivo.
 // (Los conteos NO se descargan de vuelta: cada dispositivo solo sube
 // los suyos; el historial completo se consulta desde Firestore/consola
 // si se necesita mas adelante).
-const TABLAS_MAESTRAS: { tabla: 'productos' | 'categorias' | 'ubicaciones' | 'usuarios' | 'tiposPresentacion'; coleccion: string }[] = [
+const TABLAS_MAESTRAS: { tabla: 'productos' | 'categorias' | 'ubicaciones' | 'usuarios' | 'sucursales' | 'tiposEmpaque'; coleccion: string }[] = [
   { tabla: 'productos', coleccion: 'productos' },
   { tabla: 'categorias', coleccion: 'categorias' },
   { tabla: 'ubicaciones', coleccion: 'ubicaciones' },
   { tabla: 'usuarios', coleccion: 'usuarios' },
-  { tabla: 'tiposPresentacion', coleccion: 'tiposPresentacion' },
+  { tabla: 'sucursales', coleccion: 'sucursales' },
+  { tabla: 'tiposEmpaque', coleccion: 'tiposEmpaque' },
 ];
 
 export async function hayConexionReal(): Promise<boolean> {

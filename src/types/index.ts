@@ -34,17 +34,11 @@ export interface Categoria {
   activo: boolean;
 }
 
-// Los tipos de presentación (paquete, caja, etc.) ahora los administra el
-// admin desde /admin/tipos-presentacion, así que el campo es un id libre
-// que referencia un TipoPresentacionItem, no un union fijo.
-export type TipoPresentacion = string;
+export type TipoPresentacion = string; // referencia al nombre de un TipoEmpaque, o 'UNIDAD' (sin empaque)
 
-export interface TipoPresentacionItem {
+export interface TipoEmpaque {
   id: string;
-  nombre: string;
-  // Marca el único tipo reservado que representa "sin empaque" (antes 'UNIDAD').
-  // Este tipo no se puede eliminar porque la lógica de conteo depende de él.
-  esUnidad: boolean;
+  nombre: string; // ej. "Paquete", "Caja", "Docena"
   activo: boolean;
 }
 
@@ -107,7 +101,7 @@ export interface Conteo {
 // Cola de sincronización: cada mutación local genera una operación pendiente
 export interface OperacionSync {
   id: string;
-  tipo: 'CONTEO' | 'PRODUCTO' | 'CATEGORIA' | 'UBICACION' | 'USUARIO' | 'SUCURSAL' | 'TIPO_PRESENTACION';
+  tipo: 'CONTEO' | 'PRODUCTO' | 'CATEGORIA' | 'UBICACION' | 'USUARIO' | 'SUCURSAL' | 'TIPO_EMPAQUE';
   entidadId: string;
   payload: unknown;
   accion: 'CREAR' | 'ACTUALIZAR' | 'ELIMINAR';
