@@ -37,8 +37,11 @@ export default function CountPage() {
     return todos;
   });
   const categorias = useLiveQuery(() => db.categorias.toArray());
-  const ubicaciones = useLiveQuery(() => db.ubicaciones.toArray());
   const usuario = useLiveQuery(() => (usuarioId ? db.usuarios.get(usuarioId) : undefined), [usuarioId]);
+  const ubicaciones = useLiveQuery(async () => {
+    const todas = await db.ubicaciones.toArray();
+    return usuario ? todas.filter((u) => u.sucursalId === usuario.sucursalId && u.activo) : [];
+  }, [usuario]);
 
   const productosOrdenados = useMemo(() => {
     if (!productos) return [];

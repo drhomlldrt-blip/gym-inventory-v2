@@ -23,7 +23,6 @@ export async function sembrarDatosSiVacio() {
   await db.categorias.bulkAdd(categorias);
 
   const ahora = new Date().toISOString();
-  const todasLasUbicaciones = ['ubic_mostrador', 'ubic_refri'];
 
   // Catalogo tomado de tu hoja de conteo actual.
   // Quedan como "solo por unidad" (sin paquete) por defecto: entra a
@@ -50,7 +49,6 @@ export async function sembrarDatosSiVacio() {
       unidadIndividual: 'unidad',
       tipoPresentacion: 'UNIDAD',
       unidadesPorPaquete: 1,
-      ubicacionesHabilitadas: todasLasUbicaciones,
       estado: 'ACTIVO',
       orden,
       sucursalId: 'suc_1',

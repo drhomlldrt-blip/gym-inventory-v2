@@ -51,7 +51,7 @@ export interface Producto {
   tipoPresentacion: TipoPresentacion;
   nombrePresentacionPersonalizada?: string;
   unidadesPorPaquete: number; // 1 si es tipo UNIDAD (sin empaque)
-  ubicacionesHabilitadas: string[]; // ids de Ubicacion
+  ubicacionesHabilitadas?: string[]; // en desuso: las ubicaciones ahora se muestran automaticamente según la sucursal de quien cuenta
   estado: 'ACTIVO' | 'INACTIVO';
   orden: number; // orden por defecto (fallback si una sucursal no tiene orden propio)
   ordenPorSucursal?: Record<string, number>; // orden especifico por sucursalId

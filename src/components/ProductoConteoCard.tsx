@@ -34,13 +34,13 @@ export default function ProductoConteoCard({
     cantidadesPorUbicacion
   );
 
-  const ubicacionesDelProducto = ubicaciones.filter((u) =>
-    producto.ubicacionesHabilitadas.includes(u.id)
-  );
-
+  // Las ubicaciones ya vienen filtradas por la sucursal de quien cuenta
+  // (ver count/page.tsx). Cada sucursal define las suyas, asi que si una
+  // sucursal no tiene "Refrigeradora" creada, simplemente no aparece aqui
+  // para nadie contando en esa sucursal.
   const columnas = [
     ...(sinPaquete ? [] : [{ id: '__paquetes__', label: 'Paquete' }]),
-    ...ubicacionesDelProducto.map((u) => ({ id: u.id, label: u.nombre })),
+    ...ubicaciones.map((u) => ({ id: u.id, label: u.nombre })),
   ];
 
   function valorColumna(colId: string) {

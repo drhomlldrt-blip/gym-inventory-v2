@@ -203,7 +203,6 @@ export default function AdminProductosPage() {
       {creando && (
         <FormularioProducto
           categorias={categorias ?? []}
-          ubicaciones={ubicaciones ?? []}
           tiposEmpaque={tiposEmpaque ?? []}
           onCerrar={() => setCreando(false)}
         />
@@ -213,7 +212,6 @@ export default function AdminProductosPage() {
         <FormularioProducto
           productoExistente={editando}
           categorias={categorias ?? []}
-          ubicaciones={ubicaciones ?? []}
           tiposEmpaque={tiposEmpaque ?? []}
           onCerrar={() => setEditando(null)}
         />
@@ -225,13 +223,11 @@ export default function AdminProductosPage() {
 function FormularioProducto({
   productoExistente,
   categorias,
-  ubicaciones,
   tiposEmpaque,
   onCerrar,
 }: {
   productoExistente?: Producto;
   categorias: { id: string; nombre: string }[];
-  ubicaciones: { id: string; nombre: string }[];
   tiposEmpaque: TipoEmpaque[];
   onCerrar: () => void;
 }) {
@@ -241,9 +237,6 @@ function FormularioProducto({
     productoExistente?.tipoPresentacion ?? tiposEmpaque[0]?.nombre ?? 'Paquete'
   );
   const [unidadesPorPaquete, setUnidadesPorPaquete] = useState(productoExistente?.unidadesPorPaquete ?? 1);
-  const [ubicacionesSel, setUbicacionesSel] = useState<string[]>(
-    productoExistente?.ubicacionesHabilitadas ?? ubicaciones.map((u) => u.id)
-  );
 
   async function guardar() {
     if (!nombre.trim()) return;
@@ -256,7 +249,6 @@ function FormularioProducto({
         categoriaId,
         tipoPresentacion: presentacion,
         unidadesPorPaquete: presentacion === 'UNIDAD' ? 1 : unidadesPorPaquete,
-        ubicacionesHabilitadas: ubicacionesSel,
         fechaModificacion: ahora,
       };
       await db.productos.put(actualizado);
@@ -269,7 +261,6 @@ function FormularioProducto({
         unidadIndividual: 'unidad',
         tipoPresentacion: presentacion,
         unidadesPorPaquete: presentacion === 'UNIDAD' ? 1 : unidadesPorPaquete,
-        ubicacionesHabilitadas: ubicacionesSel,
         estado: 'ACTIVO',
         orden: 999,
         sucursalId: 'suc_1',
@@ -318,23 +309,10 @@ function FormularioProducto({
             className="px-4 py-3 rounded-xl border border-surface-border bg-surface text-paper"
           />
         )}
-        <div className="flex flex-col gap-2">
-          <p className="text-sm text-muted">Ubicaciones</p>
-          {ubicaciones.map((u) => (
-            <label key={u.id} className="flex items-center gap-2 text-paper">
-              <input
-                type="checkbox"
-                checked={ubicacionesSel.includes(u.id)}
-                onChange={(e) =>
-                  setUbicacionesSel((prev) =>
-                    e.target.checked ? [...prev, u.id] : prev.filter((id) => id !== u.id)
-                  )
-                }
-              />
-              {u.nombre}
-            </label>
-          ))}
-        </div>
+        <p className="text-xs text-muted">
+          Las ubicaciones se muestran automáticamente según las que existan en cada sucursal
+          (Admin → Ubicaciones). No hace falta elegirlas aquí.
+        </p>
         <div className="flex gap-3">
           <button onClick={onCerrar} className="flex-1 py-3 rounded-xl border border-surface-border text-paper font-semibold">Cancelar</button>
           <button onClick={guardar} className="flex-1 py-3 rounded-xl bg-brand text-white font-semibold">GUARDAR</button>
