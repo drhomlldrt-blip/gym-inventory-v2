@@ -35,7 +35,7 @@ export default function ProductoConteoCard({
   );
 
   const ubicacionesDelProducto = ubicaciones.filter((u) =>
-    producto.ubicacionesHabilitadas.includes(u.id)
+    (producto.ubicacionesHabilitadas ?? []).includes(u.id)
   );
 
   const columnas = [

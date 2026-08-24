@@ -128,7 +128,7 @@ export default function AdminProductosPage() {
                     <p className="text-xs text-muted">
                       {p.tipoPresentacion === 'UNIDAD' ? 'Solo por unidad' : `${p.unidadesPorPaquete} u/${p.tipoPresentacion.toLowerCase()}`}
                       {' · '}
-                      {p.ubicacionesHabilitadas.length} ubicación(es)
+                      {(p.ubicacionesHabilitadas ?? []).length} ubicación(es)
                     </p>
                   </button>
                   <button
