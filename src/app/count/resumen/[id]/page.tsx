@@ -31,10 +31,10 @@ export default function ResumenConteoPage({ params }: { params: { id: string } }
         <SyncIndicator />
       </div>
 
-      <div className="text-sm text-muted">
-        <p>Fecha: {new Date(conteo.fecha).toLocaleDateString('es-BO')}</p>
-        <p>Realizado por: {conteo.usuarioNombre}</p>
-      </div>
+      <p className="text-sm text-muted">
+        Fecha: {new Date(conteo.fecha).toLocaleDateString('es-BO')}{' '}
+        {new Date(conteo.fecha).toLocaleTimeString('es-BO', { hour: '2-digit', minute: '2-digit' })}
+      </p>
 
       {porCategoria.map(({ categoria, items }) => (
         <div key={categoria.id} className="flex flex-col gap-2">

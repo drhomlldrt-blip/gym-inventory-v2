@@ -4,8 +4,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useRouter } from 'next/navigation';
 import { db, encolarOperacion } from '@/lib/db';
-import { CantidadesPorUbicacion, Conteo, ItemConteo, calcularTotalItem, ordenEfectivo } from '@/types';
+import { CantidadesPorUbicacion, Conteo, ItemConteo, calcularTotalItem } from '@/types';
 import { descargarCatalogo } from '@/lib/sync';
+import { verificarSesionActiva } from '@/lib/auth-guard';
 import ProductoConteoCard from '@/components/ProductoConteoCard';
 import SyncIndicator from '@/components/SyncIndicator';
 
@@ -16,46 +17,32 @@ type EstadoBorrador = Record<
 
 export default function CountPage() {
   const router = useRouter();
-  const [usuarioId, setUsuarioId] = useState<string | null>(null);
   const [busqueda, setBusqueda] = useState('');
   const [categoriaActiva, setCategoriaActiva] = useState<string | 'TODAS'>('TODAS');
   const [borrador, setBorrador] = useState<EstadoBorrador>({});
   const [guardando, setGuardando] = useState(false);
+  const [modoOrdenar, setModoOrdenar] = useState(false);
 
   useEffect(() => {
-    const id = sessionStorage.getItem('usuarioActivoId');
-    if (!id) {
-      router.push('/');
-      return;
-    }
-    setUsuarioId(id);
+    if (!verificarSesionActiva(router)) return;
     descargarCatalogo();
   }, [router]);
 
   const productos = useLiveQuery(async () => {
     const todos = await db.productos.where('estado').equals('ACTIVO').toArray();
-    return todos;
+    return todos.sort((a, b) => a.orden - b.orden);
   });
   const categorias = useLiveQuery(() => db.categorias.toArray());
-  const usuario = useLiveQuery(() => (usuarioId ? db.usuarios.get(usuarioId) : undefined), [usuarioId]);
-  const ubicaciones = useLiveQuery(async () => {
-    const todas = await db.ubicaciones.toArray();
-    return usuario ? todas.filter((u) => u.sucursalId === usuario.sucursalId && u.activo) : [];
-  }, [usuario]);
-
-  const productosOrdenados = useMemo(() => {
-    if (!productos) return [];
-    const sucId = usuario?.sucursalId ?? '';
-    return [...productos].sort((a, b) => ordenEfectivo(a, sucId) - ordenEfectivo(b, sucId));
-  }, [productos, usuario]);
+  const ubicaciones = useLiveQuery(() => db.ubicaciones.toArray());
 
   const productosFiltrados = useMemo(() => {
-    return productosOrdenados.filter((p) => {
+    if (!productos) return [];
+    return productos.filter((p) => {
       const coincideCategoria = categoriaActiva === 'TODAS' || p.categoriaId === categoriaActiva;
       const coincideBusqueda = p.nombre.toLowerCase().includes(busqueda.toLowerCase());
       return coincideCategoria && coincideBusqueda;
     });
-  }, [productosOrdenados, categoriaActiva, busqueda]);
+  }, [productos, categoriaActiva, busqueda]);
 
   function actualizarPaquetes(productoId: string, valor: number) {
     setBorrador((prev) => ({
@@ -88,6 +75,28 @@ export default function CountPage() {
     });
   }
 
+  async function moverProducto(productoId: string, direccion: 'subir' | 'bajar') {
+    if (!productos) return;
+    const producto = productos.find((p) => p.id === productoId);
+    if (!producto) return;
+    const listaCategoria = productos
+      .filter((x) => x.categoriaId === producto.categoriaId)
+      .sort((a, b) => a.orden - b.orden);
+    const idx = listaCategoria.findIndex((x) => x.id === productoId);
+    const idxVecino = direccion === 'subir' ? idx - 1 : idx + 1;
+    if (idxVecino < 0 || idxVecino >= listaCategoria.length) return;
+
+    const vecino = listaCategoria[idxVecino];
+    const ahora = new Date().toISOString();
+    const pActualizado = { ...producto, orden: vecino.orden, fechaModificacion: ahora };
+    const vecinoActualizado = { ...vecino, orden: producto.orden, fechaModificacion: ahora };
+
+    await db.productos.put(pActualizado);
+    await db.productos.put(vecinoActualizado);
+    await encolarOperacion({ tipo: 'PRODUCTO', entidadId: producto.id, accion: 'ACTUALIZAR', payload: pActualizado });
+    await encolarOperacion({ tipo: 'PRODUCTO', entidadId: vecino.id, accion: 'ACTUALIZAR', payload: vecinoActualizado });
+  }
+
   const totalUnidadesGeneral = useMemo(() => {
     if (!productos) return 0;
     return productos.reduce((acc, p) => {
@@ -103,7 +112,7 @@ export default function CountPage() {
   }).length;
 
   async function guardarConteo() {
-    if (!usuario || !productos) return;
+    if (!productos) return;
     setGuardando(true);
 
     const items: ItemConteo[] = productos
@@ -124,9 +133,6 @@ export default function CountPage() {
     const conteo: Conteo = {
       id: `INV-${Date.now()}`,
       fecha: ahora,
-      usuarioId: usuario.id,
-      usuarioNombre: usuario.nombre,
-      sucursalId: usuario.sucursalId,
       items,
       totalProductos: items.length,
       totalUnidades: items.reduce((acc, it) => acc + it.totalUnidades, 0),
@@ -149,17 +155,20 @@ export default function CountPage() {
     router.push(`/count/resumen/${conteo.id}`);
   }
 
-  if (!usuario) return <div className="p-8 text-center text-slate-400">Cargando...</div>;
-
   return (
     <main className="max-w-md mx-auto pb-32 min-h-screen bg-surface">
       <header className="sticky top-0 bg-surface/95 backdrop-blur z-10 p-4 flex flex-col gap-3 border-b border-surface-border">
         <div className="flex justify-between items-center">
           <div>
             <h1 className="text-xl font-bold text-white">Inventario</h1>
-            <p className="text-xs text-slate-400">{usuario.nombre}</p>
           </div>
           <div className="flex items-center gap-3">
+            <button
+              onClick={() => setModoOrdenar((v) => !v)}
+              className={`text-xs underline ${modoOrdenar ? 'text-brand' : 'text-slate-400'}`}
+            >
+              {modoOrdenar ? 'Listo' : 'Ordenar'}
+            </button>
             <button
               onClick={() => router.push('/historial')}
               className="text-xs text-slate-400 underline"
@@ -169,6 +178,11 @@ export default function CountPage() {
             <SyncIndicator />
           </div>
         </div>
+        {modoOrdenar && (
+          <p className="text-xs text-muted">
+            Usa las flechas para poner primero los productos que más cuentas.
+          </p>
+        )}
         <input
           placeholder="Buscar producto..."
           value={busqueda}
@@ -195,38 +209,61 @@ export default function CountPage() {
       </header>
 
       <div className="p-4 flex flex-col gap-4">
-        {productosFiltrados.map((p) => (
-          <ProductoConteoCard
-            key={p.id}
-            producto={p}
-            ubicaciones={ubicaciones ?? []}
-            paquetes={borrador[p.id]?.paquetes ?? 0}
-            cantidadesPorUbicacion={borrador[p.id]?.cantidadesPorUbicacion ?? {}}
-            onCambiarPaquetes={(v) => actualizarPaquetes(p.id, v)}
-            onCambiarUbicacion={(ubicId, v) => actualizarUbicacion(p.id, ubicId, v)}
-            onLimpiar={() => limpiarProducto(p.id)}
-          />
+        {productosFiltrados.map((p, idx) => (
+          <div key={p.id} className="flex items-center gap-2">
+            {modoOrdenar && (
+              <div className="flex flex-col shrink-0">
+                <button
+                  onClick={() => moverProducto(p.id, 'subir')}
+                  disabled={idx === 0}
+                  className="text-muted disabled:opacity-20 leading-none px-1"
+                >
+                  ▲
+                </button>
+                <button
+                  onClick={() => moverProducto(p.id, 'bajar')}
+                  disabled={idx === productosFiltrados.length - 1}
+                  className="text-muted disabled:opacity-20 leading-none px-1"
+                >
+                  ▼
+                </button>
+              </div>
+            )}
+            <div className="flex-1">
+              <ProductoConteoCard
+                producto={p}
+                ubicaciones={ubicaciones ?? []}
+                paquetes={borrador[p.id]?.paquetes ?? 0}
+                cantidadesPorUbicacion={borrador[p.id]?.cantidadesPorUbicacion ?? {}}
+                onCambiarPaquetes={(v) => actualizarPaquetes(p.id, v)}
+                onCambiarUbicacion={(ubicId, v) => actualizarUbicacion(p.id, ubicId, v)}
+                onLimpiar={() => limpiarProducto(p.id)}
+              />
+            </div>
+          </div>
         ))}
         {productosFiltrados.length === 0 && (
           <p className="text-center text-slate-500 py-10">No se encontraron productos.</p>
         )}
       </div>
 
-      <div className="fixed bottom-0 left-0 right-0 bg-surface-card border-t border-surface-border p-4">
-        <div className="max-w-md mx-auto flex flex-col gap-3">
-          <div className="flex justify-between text-sm text-slate-400">
-            <span>{productosContados} productos contados</span>
-            <span className="font-semibold text-white">{totalUnidadesGeneral} unidades</span>
+      {!modoOrdenar && (
+        <div className="fixed bottom-0 left-0 right-0 bg-surface-card border-t border-surface-border p-4">
+          <div className="max-w-md mx-auto flex flex-col gap-3">
+            <div className="flex justify-between text-sm text-slate-400">
+              <span>{productosContados} productos contados</span>
+              <span className="font-semibold text-white">{totalUnidadesGeneral} unidades</span>
+            </div>
+            <button
+              onClick={guardarConteo}
+              disabled={guardando || productosContados === 0}
+              className="py-4 rounded-2xl bg-brand text-white text-lg font-semibold disabled:opacity-40 active:scale-[0.98] transition"
+            >
+              {guardando ? 'Guardando...' : 'GUARDAR CONTEO'}
+            </button>
           </div>
-          <button
-            onClick={guardarConteo}
-            disabled={guardando || productosContados === 0}
-            className="py-4 rounded-2xl bg-brand text-white text-lg font-semibold disabled:opacity-40 active:scale-[0.98] transition"
-          >
-            {guardando ? 'Guardando...' : 'GUARDAR CONTEO'}
-          </button>
         </div>
-      </div>
+      )}
     </main>
   );
 }

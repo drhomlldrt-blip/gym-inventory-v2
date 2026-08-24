@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useRouter } from 'next/navigation';
 import { db, encolarOperacion } from '@/lib/db';
-import { Producto, TipoPresentacion, ordenEfectivo, TipoEmpaque } from '@/types';
+import { Producto, TipoPresentacion, TipoEmpaque } from '@/types';
 import { descargarCatalogo } from '@/lib/sync';
 import { verificarEsAdmin } from '@/lib/auth-guard';
 import SyncIndicator from '@/components/SyncIndicator';
@@ -13,24 +13,18 @@ export default function AdminProductosPage() {
   const router = useRouter();
   const [creando, setCreando] = useState(false);
   const [editando, setEditando] = useState<Producto | null>(null);
-  // null = orden general (por defecto). Si se elige una sucursal, el
-  // orden que se mueva con las flechas aplica SOLO a esa sucursal.
-  const [sucursalOrdenando, setSucursalOrdenando] = useState<string | null>(null);
-
-  const productos = useLiveQuery(async () => db.productos.toArray());
+  const productos = useLiveQuery(async () => {
+    const todos = await db.productos.toArray();
+    return todos.sort((a, b) => a.orden - b.orden);
+  });
   const categorias = useLiveQuery(() => db.categorias.toArray());
   const ubicaciones = useLiveQuery(() => db.ubicaciones.toArray());
+  const tiposEmpaque = useLiveQuery(() => db.tiposEmpaque.toArray());
   const conteos = useLiveQuery(() => db.conteos.toArray());
-  const sucursales = useLiveQuery(() => db.sucursales.toArray());
-  const tiposEmpaque = useLiveQuery(async () => {
-    const todos = await db.tiposEmpaque.toArray();
-    return todos.filter((t) => t.activo);
-  });
 
   useEffect(() => {
-    verificarEsAdmin(router).then((esAdmin) => {
-      if (esAdmin) descargarCatalogo();
-    });
+    if (!verificarEsAdmin(router)) return;
+    descargarCatalogo();
   }, [router]);
 
   async function alternarActivo(p: Producto) {
@@ -44,7 +38,7 @@ export default function AdminProductosPage() {
     const tieneHistorial = (conteos ?? []).some((c) => c.items.some((it) => it.productoId === p.id));
     if (tieneHistorial) {
       alert(
-        `"${p.nombre}" ya tiene conteos guardados en el historial. Para no perder esos datos, se recomienda desactivarlo en vez de eliminarlo (usa el botón de estado).`
+        `"${p.nombre}" ya tiene conteos guardados en el historial. Para no perder esos datos, se recomienda desactivarlo en vez de eliminarlo.`
       );
       return;
     }
@@ -57,36 +51,15 @@ export default function AdminProductosPage() {
     if (!productos) return;
     const listaCategoria = productos
       .filter((x) => x.categoriaId === p.categoriaId)
-      .sort((a, b) => ordenEfectivo(a, sucursalOrdenando) - ordenEfectivo(b, sucursalOrdenando));
+      .sort((a, b) => a.orden - b.orden);
     const idx = listaCategoria.findIndex((x) => x.id === p.id);
     const idxVecino = direccion === 'subir' ? idx - 1 : idx + 1;
     if (idxVecino < 0 || idxVecino >= listaCategoria.length) return;
 
     const vecino = listaCategoria[idxVecino];
     const ahora = new Date().toISOString();
-    const ordenP = ordenEfectivo(p, sucursalOrdenando);
-    const ordenVecino = ordenEfectivo(vecino, sucursalOrdenando);
-
-    let pActualizado: Producto;
-    let vecinoActualizado: Producto;
-
-    if (sucursalOrdenando) {
-      // Solo afecta el orden de esta sucursal, sin tocar el orden general
-      // ni el de las demas sucursales.
-      pActualizado = {
-        ...p,
-        ordenPorSucursal: { ...(p.ordenPorSucursal ?? {}), [sucursalOrdenando]: ordenVecino },
-        fechaModificacion: ahora,
-      };
-      vecinoActualizado = {
-        ...vecino,
-        ordenPorSucursal: { ...(vecino.ordenPorSucursal ?? {}), [sucursalOrdenando]: ordenP },
-        fechaModificacion: ahora,
-      };
-    } else {
-      pActualizado = { ...p, orden: ordenVecino, fechaModificacion: ahora };
-      vecinoActualizado = { ...vecino, orden: ordenP, fechaModificacion: ahora };
-    }
+    const pActualizado = { ...p, orden: vecino.orden, fechaModificacion: ahora };
+    const vecinoActualizado = { ...vecino, orden: p.orden, fechaModificacion: ahora };
 
     await db.productos.put(pActualizado);
     await db.productos.put(vecinoActualizado);
@@ -103,16 +76,16 @@ export default function AdminProductosPage() {
 
       <div className="flex gap-3 text-sm flex-wrap">
         <button onClick={() => router.push('/historial')} className="text-muted underline">
-          Historial de conteos →
+          Historial →
         </button>
         <button onClick={() => router.push('/admin/ubicaciones')} className="text-muted underline">
-          Gestionar ubicaciones →
-        </button>
-        <button onClick={() => router.push('/admin/usuarios')} className="text-muted underline">
-          Gestionar usuarios →
+          Ubicaciones →
         </button>
         <button onClick={() => router.push('/admin/tipos-empaque')} className="text-muted underline">
-          Gestionar tipos de empaque →
+          Tipos de empaque →
+        </button>
+        <button onClick={() => router.push('/admin/configuracion')} className="text-muted underline">
+          Configuración →
         </button>
       </div>
 
@@ -123,39 +96,11 @@ export default function AdminProductosPage() {
         + NUEVO PRODUCTO
       </button>
 
-      {(sucursales ?? []).length > 0 && (
-        <div className="flex flex-col gap-2">
-          <p className="text-sm text-muted">Ordenando para:</p>
-          <div className="flex gap-2 overflow-x-auto pb-1">
-            <button
-              onClick={() => setSucursalOrdenando(null)}
-              className={`px-4 py-2 rounded-full text-sm whitespace-nowrap ${sucursalOrdenando === null ? 'bg-brand text-white' : 'bg-surface-card border border-surface-border text-slate-300'}`}
-            >
-              General (por defecto)
-            </button>
-            {(sucursales ?? []).map((s) => (
-              <button
-                key={s.id}
-                onClick={() => setSucursalOrdenando(s.id)}
-                className={`px-4 py-2 rounded-full text-sm whitespace-nowrap ${sucursalOrdenando === s.id ? 'bg-brand text-white' : 'bg-surface-card border border-surface-border text-slate-300'}`}
-              >
-                {s.nombre}
-              </button>
-            ))}
-          </div>
-          {sucursalOrdenando && (
-            <p className="text-xs text-muted">
-              Las flechas ahora mueven el orden solo para esta sucursal. Las demás no se ven afectadas.
-            </p>
-          )}
-        </div>
-      )}
-
       <div className="flex flex-col gap-5">
         {(categorias ?? []).map((cat) => {
           const productosCategoria = (productos ?? [])
             .filter((p) => p.categoriaId === cat.id)
-            .sort((a, b) => ordenEfectivo(a, sucursalOrdenando) - ordenEfectivo(b, sucursalOrdenando));
+            .sort((a, b) => a.orden - b.orden);
           if (productosCategoria.length === 0) return null;
           return (
             <div key={cat.id} className="flex flex-col gap-2">
@@ -182,6 +127,8 @@ export default function AdminProductosPage() {
                     <p className="font-medium text-paper">{p.nombre}</p>
                     <p className="text-xs text-muted">
                       {p.tipoPresentacion === 'UNIDAD' ? 'Solo por unidad' : `${p.unidadesPorPaquete} u/${p.tipoPresentacion.toLowerCase()}`}
+                      {' · '}
+                      {p.ubicacionesHabilitadas.length} ubicación(es)
                     </p>
                   </button>
                   <button
@@ -203,6 +150,7 @@ export default function AdminProductosPage() {
       {creando && (
         <FormularioProducto
           categorias={categorias ?? []}
+          ubicaciones={ubicaciones ?? []}
           tiposEmpaque={tiposEmpaque ?? []}
           onCerrar={() => setCreando(false)}
         />
@@ -212,6 +160,7 @@ export default function AdminProductosPage() {
         <FormularioProducto
           productoExistente={editando}
           categorias={categorias ?? []}
+          ubicaciones={ubicaciones ?? []}
           tiposEmpaque={tiposEmpaque ?? []}
           onCerrar={() => setEditando(null)}
         />
@@ -223,11 +172,13 @@ export default function AdminProductosPage() {
 function FormularioProducto({
   productoExistente,
   categorias,
+  ubicaciones,
   tiposEmpaque,
   onCerrar,
 }: {
   productoExistente?: Producto;
   categorias: { id: string; nombre: string }[];
+  ubicaciones: { id: string; nombre: string }[];
   tiposEmpaque: TipoEmpaque[];
   onCerrar: () => void;
 }) {
@@ -237,9 +188,16 @@ function FormularioProducto({
     productoExistente?.tipoPresentacion ?? tiposEmpaque[0]?.nombre ?? 'Paquete'
   );
   const [unidadesPorPaquete, setUnidadesPorPaquete] = useState(productoExistente?.unidadesPorPaquete ?? 1);
+  const [ubicacionesSel, setUbicacionesSel] = useState<string[]>(
+    productoExistente?.ubicacionesHabilitadas ?? ubicaciones.map((u) => u.id)
+  );
 
   async function guardar() {
     if (!nombre.trim()) return;
+    if (ubicacionesSel.length === 0) {
+      alert('Elige al menos una ubicación para este producto.');
+      return;
+    }
     const ahora = new Date().toISOString();
 
     if (productoExistente) {
@@ -249,6 +207,7 @@ function FormularioProducto({
         categoriaId,
         tipoPresentacion: presentacion,
         unidadesPorPaquete: presentacion === 'UNIDAD' ? 1 : unidadesPorPaquete,
+        ubicacionesHabilitadas: ubicacionesSel,
         fechaModificacion: ahora,
       };
       await db.productos.put(actualizado);
@@ -261,9 +220,9 @@ function FormularioProducto({
         unidadIndividual: 'unidad',
         tipoPresentacion: presentacion,
         unidadesPorPaquete: presentacion === 'UNIDAD' ? 1 : unidadesPorPaquete,
+        ubicacionesHabilitadas: ubicacionesSel,
         estado: 'ACTIVO',
         orden: 999,
-        sucursalId: 'suc_1',
         fechaCreacion: ahora,
         fechaModificacion: ahora,
       };
@@ -309,10 +268,29 @@ function FormularioProducto({
             className="px-4 py-3 rounded-xl border border-surface-border bg-surface text-paper"
           />
         )}
-        <p className="text-xs text-muted">
-          Las ubicaciones se muestran automáticamente según las que existan en cada sucursal
-          (Admin → Ubicaciones). No hace falta elegirlas aquí.
-        </p>
+        <div className="flex flex-col gap-2">
+          <p className="text-sm text-muted">¿Dónde se cuenta este producto?</p>
+          {ubicaciones.map((u) => (
+            <label key={u.id} className="flex items-center gap-2 text-paper">
+              <input
+                type="checkbox"
+                checked={ubicacionesSel.includes(u.id)}
+                onChange={(e) =>
+                  setUbicacionesSel((prev) =>
+                    e.target.checked ? [...prev, u.id] : prev.filter((id) => id !== u.id)
+                  )
+                }
+              />
+              {u.nombre}
+            </label>
+          ))}
+          {ubicaciones.length === 0 && (
+            <p className="text-xs text-muted">
+              No hay ubicaciones creadas.{' '}
+              <a href="/admin/ubicaciones" className="underline text-brand">Crear una aquí</a>.
+            </p>
+          )}
+        </div>
         <div className="flex gap-3">
           <button onClick={onCerrar} className="flex-1 py-3 rounded-xl border border-surface-border text-paper font-semibold">Cancelar</button>
           <button onClick={guardar} className="flex-1 py-3 rounded-xl bg-brand text-white font-semibold">GUARDAR</button>

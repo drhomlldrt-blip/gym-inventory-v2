@@ -4,9 +4,10 @@ import { useEffect, useMemo, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useRouter } from 'next/navigation';
 import { db } from '@/lib/db';
+import { verificarSesionActiva } from '@/lib/auth-guard';
 import SyncIndicator from '@/components/SyncIndicator';
 
-type Filtro = 'HOY' | 'AYER' | '3DIAS';
+type Filtro = 'HOY' | 'AYER' | '3DIAS' | 'TODOS';
 
 function inicioDia(fecha: Date) {
   const d = new Date(fecha);
@@ -19,8 +20,7 @@ export default function HistorialPage() {
   const [filtro, setFiltro] = useState<Filtro>('3DIAS');
 
   useEffect(() => {
-    const id = sessionStorage.getItem('usuarioActivoId');
-    if (!id) router.push('/');
+    verificarSesionActiva(router);
   }, [router]);
 
   const conteos = useLiveQuery(async () => {
@@ -30,6 +30,8 @@ export default function HistorialPage() {
 
   const conteosFiltrados = useMemo(() => {
     if (!conteos) return [];
+    if (filtro === 'TODOS') return conteos;
+
     const ahora = new Date();
     const hoy = inicioDia(ahora);
 
@@ -66,14 +68,14 @@ export default function HistorialPage() {
         <SyncIndicator />
       </div>
 
-      <div className="flex gap-2">
-        {(['HOY', 'AYER', '3DIAS'] as Filtro[]).map((f) => (
+      <div className="flex gap-2 overflow-x-auto pb-1">
+        {(['HOY', 'AYER', '3DIAS', 'TODOS'] as Filtro[]).map((f) => (
           <button
             key={f}
             onClick={() => setFiltro(f)}
-            className={`px-4 py-2 rounded-full text-sm ${filtro === f ? 'bg-brand text-white' : 'bg-surface-card border border-surface-border text-slate-300'}`}
+            className={`px-4 py-2 rounded-full text-sm whitespace-nowrap ${filtro === f ? 'bg-brand text-white' : 'bg-surface-card border border-surface-border text-slate-300'}`}
           >
-            {f === 'HOY' ? 'Hoy' : f === 'AYER' ? 'Ayer' : 'Últimos 3 días'}
+            {f === 'HOY' ? 'Hoy' : f === 'AYER' ? 'Ayer' : f === '3DIAS' ? 'Últimos 3 días' : 'Todos'}
           </button>
         ))}
       </div>
@@ -95,9 +97,7 @@ export default function HistorialPage() {
                   {new Date(c.fecha).toLocaleTimeString('es-BO', { hour: '2-digit', minute: '2-digit' })}
                 </span>
               </p>
-              <p className="text-xs text-muted">
-                {c.usuarioNombre} · {c.totalProductos} productos
-              </p>
+              <p className="text-xs text-muted">{c.totalProductos} productos</p>
             </div>
             <div className="text-right">
               <p className="font-bold text-brand">{c.totalUnidades} u.</p>

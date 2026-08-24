@@ -3,56 +3,41 @@ import {
   Producto,
   Categoria,
   Ubicacion,
-  Sucursal,
-  Usuario,
+  TipoEmpaque,
   Conteo,
   OperacionSync,
-  TipoEmpaque,
+  Configuracion,
 } from '@/types';
 
 // ==========================================================
 // BASE DE DATOS LOCAL (IndexedDB) — fuente de verdad offline
 // ==========================================================
-// Todo se lee/escribe aquí primero. Firebase es solo respaldo/sync.
 
 export class InventarioDB extends Dexie {
   productos!: Table<Producto, string>;
   categorias!: Table<Categoria, string>;
   ubicaciones!: Table<Ubicacion, string>;
-  sucursales!: Table<Sucursal, string>;
-  usuarios!: Table<Usuario, string>;
-  conteos!: Table<Conteo, string>;
-  syncQueue!: Table<OperacionSync, string>;
   tiposEmpaque!: Table<TipoEmpaque, string>;
+  conteos!: Table<Conteo, string>;
+  configuracion!: Table<Configuracion, string>;
+  syncQueue!: Table<OperacionSync, string>;
 
   constructor() {
-    super('gym_inventario_db');
+    super('gym_inventario_db_v2');
     this.version(1).stores({
-      productos: 'id, categoriaId, sucursalId, estado, orden',
+      productos: 'id, categoriaId, estado, orden',
       categorias: 'id, orden',
-      ubicaciones: 'id, sucursalId',
-      sucursales: 'id',
-      usuarios: 'id, usuario, sucursalId',
-      conteos: 'id, fecha, usuarioId, sucursalId, estadoSync, finalizado',
-      syncQueue: 'id, estado, tipo, fechaCreacion',
-    });
-    // v2: agrega tabla de tipos de empaque configurables (Paquete, Caja, etc.)
-    this.version(2).stores({
-      productos: 'id, categoriaId, sucursalId, estado, orden',
-      categorias: 'id, orden',
-      ubicaciones: 'id, sucursalId',
-      sucursales: 'id',
-      usuarios: 'id, usuario, sucursalId',
-      conteos: 'id, fecha, usuarioId, sucursalId, estadoSync, finalizado',
-      syncQueue: 'id, estado, tipo, fechaCreacion',
+      ubicaciones: 'id',
       tiposEmpaque: 'id, nombre',
+      conteos: 'id, fecha, estadoSync, finalizado',
+      configuracion: 'id',
+      syncQueue: 'id, estado, tipo, fechaCreacion',
     });
   }
 }
 
 export const db = new InventarioDB();
 
-// Encola una operación pendiente de sincronizar (requisito 30)
 export async function encolarOperacion(
   op: Omit<OperacionSync, 'id' | 'estado' | 'intentos' | 'fechaCreacion'>
 ) {

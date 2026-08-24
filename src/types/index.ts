@@ -1,29 +1,19 @@
 // ==========================================================
-// MODELO DE DATOS — Inventario de Gimnasio (offline-first)
+// MODELO DE DATOS — Inventario (offline-first)
+// Version simplificada: un solo gimnasio, dos roles compartidos
+// (Administrador / Recepcion), sin sucursales ni usuarios individuales.
 // ==========================================================
 
-export type Rol = 'ADMINISTRADOR' | 'RECEPCIONISTA';
-
-export interface Usuario {
-  id: string;
-  nombre: string;
-  usuario: string;
-  pin: string; // hash simple en cliente; en servidor se recomienda hash real
-  rol: Rol;
-  sucursalId: string;
-  activo: boolean;
-}
-
-export interface Sucursal {
-  id: string;
-  nombre: string;
-  activo: boolean;
+export interface Configuracion {
+  id: 'app';
+  adminPin: string;
+  recepcionPin: string;
+  catalogoInicializado: boolean; // evita re-sembrar datos de ejemplo una vez que el sistema ya esta en uso real
 }
 
 export interface Ubicacion {
   id: string;
-  nombre: string; // "Recepción", "Refrigeradora", "Almacén"...
-  sucursalId: string;
+  nombre: string; // "Recepción", "Refrigeradora", "Depósito"...
   activo: boolean;
 }
 
@@ -38,7 +28,7 @@ export type TipoPresentacion = string; // referencia al nombre de un TipoEmpaque
 
 export interface TipoEmpaque {
   id: string;
-  nombre: string; // ej. "Paquete", "Caja", "Docena"
+  nombre: string; // "Paquete", "Caja", "Balde", lo que el admin quiera
   activo: boolean;
 }
 
@@ -49,24 +39,12 @@ export interface Producto {
   imagenUrl?: string;
   unidadIndividual: string; // "botella", "barra", "unidad"
   tipoPresentacion: TipoPresentacion;
-  nombrePresentacionPersonalizada?: string;
   unidadesPorPaquete: number; // 1 si es tipo UNIDAD (sin empaque)
-  ubicacionesHabilitadas?: string[]; // en desuso: las ubicaciones ahora se muestran automaticamente según la sucursal de quien cuenta
+  ubicacionesHabilitadas: string[]; // ids de Ubicacion donde este producto se cuenta
   estado: 'ACTIVO' | 'INACTIVO';
-  orden: number; // orden por defecto (fallback si una sucursal no tiene orden propio)
-  ordenPorSucursal?: Record<string, number>; // orden especifico por sucursalId
-  sucursalId: string;
+  orden: number; // orden de aparicion en el conteo; ajustable por admin o recepcion
   fechaCreacion: string; // ISO
   fechaModificacion: string; // ISO
-}
-
-// Devuelve el orden efectivo de un producto para una sucursal dada:
-// usa el orden especifico de esa sucursal si existe, si no, el general.
-export function ordenEfectivo(producto: Producto, sucursalId: string | null | undefined): number {
-  if (sucursalId && producto.ordenPorSucursal && producto.ordenPorSucursal[sucursalId] !== undefined) {
-    return producto.ordenPorSucursal[sucursalId];
-  }
-  return producto.orden;
 }
 
 // Cantidades sueltas por ubicación, ej: { "ubic_recepcion": 2, "ubic_refri": 3 }
@@ -74,11 +52,11 @@ export type CantidadesPorUbicacion = Record<string, number>;
 
 export interface ItemConteo {
   productoId: string;
-  // snapshot histórico: NUNCA recalcular con config nueva del producto (requisito 31)
+  // snapshot histórico: NUNCA recalcular con config nueva del producto
   unidadesPorPaqueteUsadas: number;
   paquetes: number;
   cantidadesPorUbicacion: CantidadesPorUbicacion;
-  totalUnidades: number; // (paquetes * unidadesPorPaqueteUsadas) + suma ubicaciones
+  totalUnidades: number;
 }
 
 export type EstadoSync = 'PENDIENTE' | 'SINCRONIZADO' | 'ERROR';
@@ -86,9 +64,6 @@ export type EstadoSync = 'PENDIENTE' | 'SINCRONIZADO' | 'ERROR';
 export interface Conteo {
   id: string; // uuid local, ej "INV-000123"
   fecha: string; // ISO
-  usuarioId: string;
-  usuarioNombre: string;
-  sucursalId: string;
   items: ItemConteo[];
   totalProductos: number;
   totalUnidades: number;
@@ -101,7 +76,7 @@ export interface Conteo {
 // Cola de sincronización: cada mutación local genera una operación pendiente
 export interface OperacionSync {
   id: string;
-  tipo: 'CONTEO' | 'PRODUCTO' | 'CATEGORIA' | 'UBICACION' | 'USUARIO' | 'SUCURSAL' | 'TIPO_EMPAQUE';
+  tipo: 'CONTEO' | 'PRODUCTO' | 'CATEGORIA' | 'UBICACION' | 'TIPO_EMPAQUE' | 'CONFIGURACION';
   entidadId: string;
   payload: unknown;
   accion: 'CREAR' | 'ACTUALIZAR' | 'ELIMINAR';
@@ -111,7 +86,7 @@ export interface OperacionSync {
   ultimoError?: string;
 }
 
-// ---- Utilidad de cálculo (requisito 13) ----
+// ---- Utilidad de cálculo ----
 export function calcularTotalItem(
   paquetes: number,
   unidadesPorPaquete: number,

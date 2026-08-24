@@ -1,17 +1,29 @@
 import { db } from './db';
-import { Producto, Categoria, Ubicacion, Sucursal, Usuario, TipoEmpaque } from '@/types';
+import { Categoria, Ubicacion, TipoEmpaque, Configuracion } from '@/types';
 
-// Carga datos de ejemplo la primera vez que se abre la app (todo local).
-export async function sembrarDatosSiVacio() {
-  const hayProductos = await db.productos.count();
-  if (hayProductos > 0) return;
-
-  const sucursal: Sucursal = { id: 'suc_1', nombre: 'Sucursal Principal', activo: true };
-  await db.sucursales.add(sucursal);
+// ==========================================================
+// SIEMBRA INICIAL — solo la PRIMERA vez que el sistema se usa.
+// ==========================================================
+// Antes, esta funcion revisaba si la tabla local de productos estaba
+// vacia para decidir si volver a crear datos de ejemplo. Eso causaba
+// un bug real: si el administrador borraba productos y luego se
+// limpiaba el cache del navegador, la tabla local volvia a estar
+// vacia y la app pensaba "es la primera vez" y volvia a crear los
+// productos de ejemplo, sin importar que ya se hubieran borrado.
+//
+// Ahora usamos un marcador explicito y permanente en la nube
+// (Configuracion.catalogoInicializado). Una vez que se crea, la
+// siembra NUNCA vuelve a ejecutarse en ningun dispositivo, sin
+// importar que tan vacias esten las tablas locales.
+export async function sembrarDatosSiEsPrimeraVez() {
+  const config = await db.configuracion.get('app');
+  if (config?.catalogoInicializado) {
+    return; // el sistema ya fue inicializado antes (en este u otro dispositivo): no tocar nada
+  }
 
   const ubicaciones: Ubicacion[] = [
-    { id: 'ubic_mostrador', nombre: 'Mostrador', sucursalId: 'suc_1', activo: true },
-    { id: 'ubic_refri', nombre: 'Refrigeradora', sucursalId: 'suc_1', activo: true },
+    { id: 'ubic_mostrador', nombre: 'Mostrador', activo: true },
+    { id: 'ubic_refri', nombre: 'Refrigeradora', activo: true },
   ];
   await db.ubicaciones.bulkAdd(ubicaciones);
 
@@ -22,67 +34,22 @@ export async function sembrarDatosSiVacio() {
   ];
   await db.categorias.bulkAdd(categorias);
 
-  const ahora = new Date().toISOString();
-
-  // Catalogo tomado de tu hoja de conteo actual.
-  // Quedan como "solo por unidad" (sin paquete) por defecto: entra a
-  // Admin > Productos > Editar en cada uno y define cuantas unidades
-  // trae su paquete/caja si corresponde.
-  const nombresBebidas = [
-    'Aquarius', 'Jugo Jumbo', 'Power 1 Litro', 'Power 600ml', 'Pre Workout',
-    'V Santa 1 Litro', 'V. Santa 2 Litros', 'V Santa 600ml',
-    'Vital 1 Litro', 'Vital 2 Litros', 'Vital 3 Litros', 'Vital 600ml',
-    'Volt 350ml', 'Volt Lata 473ml', 'Yogurt', 'Zanna',
-  ];
-  const nombresSnacks = [
-    'Alfajor Nene Rice', 'Barra Chocomani', 'Barra Foodness', 'Barra Crispy',
-    'C4 Grande', 'C4 Mediana', 'Chicles', 'Dark Bar', 'Gogos', 'Irupana',
-    'Protein Joy Biscuit',
-  ];
-  const nombresOtros = ['Clinex', 'Peines'];
-
-  function crearProducto(nombre: string, categoriaId: string, orden: number): Producto {
-    return {
-      id: `prod_${nombre.toLowerCase().replace(/[^a-z0-9]+/g, '_')}`,
-      nombre,
-      categoriaId,
-      unidadIndividual: 'unidad',
-      tipoPresentacion: 'UNIDAD',
-      unidadesPorPaquete: 1,
-      estado: 'ACTIVO',
-      orden,
-      sucursalId: 'suc_1',
-      fechaCreacion: ahora,
-      fechaModificacion: ahora,
-    };
-  }
-
-  const productos: Producto[] = [
-    ...nombresBebidas.map((n, i) => crearProducto(n, 'cat_bebidas', i + 1)),
-    ...nombresSnacks.map((n, i) => crearProducto(n, 'cat_snacks', 100 + i + 1)),
-    ...nombresOtros.map((n, i) => crearProducto(n, 'cat_otros', 200 + i + 1)),
-  ];
-  await db.productos.bulkAdd(productos);
-
-  const usuarios: Usuario[] = [
-    { id: 'user_admin', nombre: 'Administrador', usuario: 'admin', pin: '0000', rol: 'ADMINISTRADOR', sucursalId: 'suc_1', activo: true },
-    { id: 'user_maria', nombre: 'Maria', usuario: 'maria', pin: '1234', rol: 'RECEPCIONISTA', sucursalId: 'suc_1', activo: true },
-  ];
-  await db.usuarios.bulkAdd(usuarios);
-}
-
-// Se ejecuta SIEMPRE (independiente de si ya hay productos), para que
-// instalaciones existentes (como la tuya, que ya tenía productos antes
-// de que existiera esta tabla) reciban los tipos de empaque por defecto.
-export async function sembrarTiposEmpaqueSiVacio() {
-  const hayTipos = await db.tiposEmpaque.count();
-  if (hayTipos > 0) return;
-
   const tiposEmpaque: TipoEmpaque[] = [
-    { id: 'tipo_paquete', nombre: 'Paquete', activo: true },
-    { id: 'tipo_caja', nombre: 'Caja', activo: true },
-    { id: 'tipo_bolsa', nombre: 'Bolsa', activo: true },
-    { id: 'tipo_fardo', nombre: 'Fardo', activo: true },
+    { id: 'temp_paquete', nombre: 'Paquete', activo: true },
+    { id: 'temp_caja', nombre: 'Caja', activo: true },
   ];
   await db.tiposEmpaque.bulkAdd(tiposEmpaque);
+
+  // No se crean productos de ejemplo: el administrador arma su propio
+  // catalogo desde cero, para evitar cualquier confusion con datos falsos.
+
+  const nuevaConfig: Configuracion = {
+    id: 'app',
+    adminPin: '284915', // codigo dificil por defecto; cambialo en Admin > Configuracion
+    recepcionPin: '0000',
+    catalogoInicializado: true,
+  };
+  await db.configuracion.put(nuevaConfig);
+
+  return nuevaConfig;
 }

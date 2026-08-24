@@ -1,22 +1,21 @@
-import { db } from './db';
-
-// Verifica que haya un usuario activo con rol ADMINISTRADOR.
-// Si no lo es (o no hay sesion), redirige y devuelve false.
-// Se usa en TODAS las pantallas dentro de /admin, para que una
-// recepcionista jamas pueda entrar ahi, ni siquiera escribiendo
-// la direccion directamente en el navegador.
-export async function verificarEsAdmin(
-  router: { push: (ruta: string) => void }
-): Promise<boolean> {
-  const id = sessionStorage.getItem('usuarioActivoId');
-  if (!id) {
-    router.push('/');
+// Verifica que la sesion activa sea de Administrador.
+// Se usa en TODAS las pantallas dentro de /admin, para que la cuenta
+// de Recepcion jamas pueda entrar ahi, ni siquiera escribiendo la
+// direccion directamente en el navegador.
+export function verificarEsAdmin(router: { push: (ruta: string) => void }): boolean {
+  const rol = sessionStorage.getItem('rolActivo');
+  if (rol !== 'ADMINISTRADOR') {
+    router.push(rol === 'RECEPCION' ? '/count' : '/');
     return false;
   }
-  const usuario = await db.usuarios.get(id);
-  if (!usuario || usuario.rol !== 'ADMINISTRADOR') {
-    // No es admin: lo mandamos a la pantalla de conteo, que si le corresponde.
-    router.push('/count');
+  return true;
+}
+
+// Verifica que haya alguna sesion activa (Admin o Recepcion).
+export function verificarSesionActiva(router: { push: (ruta: string) => void }): boolean {
+  const rol = sessionStorage.getItem('rolActivo');
+  if (!rol) {
+    router.push('/');
     return false;
   }
   return true;
