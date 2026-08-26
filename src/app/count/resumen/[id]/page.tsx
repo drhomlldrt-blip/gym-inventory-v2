@@ -15,14 +15,25 @@ export default function ResumenConteoPage({ params }: { params: { id: string } }
     return <div className="p-8 text-center text-muted min-h-screen bg-surface">Cargando...</div>;
   }
 
-  const porCategoria = categorias
-    .map((cat) => {
-      const items = conteo.items
-        .map((it) => ({ it, producto: productos.find((p) => p.id === it.productoId) }))
-        .filter(({ producto }) => producto?.categoriaId === cat.id);
-      return { categoria: cat, items };
-    })
-    .filter((g) => g.items.length > 0);
+  // Se listan TODOS los items del conteo directamente, sin depender de que
+  // la categoria del producto calce perfecto. Así nunca desaparece un
+  // producto de la vista solo porque su categoría cambió o se eliminó.
+  const itemsConProducto = conteo.items.map((it) => ({
+    it,
+    producto: productos.find((p) => p.id === it.productoId),
+  }));
+
+  function nombreCategoria(categoriaId?: string) {
+    if (!categoriaId || !categorias) return 'Otros';
+    return categorias.find((c) => c.id === categoriaId)?.nombre ?? 'Otros';
+  }
+
+  const grupos = new Map<string, typeof itemsConProducto>();
+  for (const item of itemsConProducto) {
+    const nombreCat = nombreCategoria(item.producto?.categoriaId);
+    if (!grupos.has(nombreCat)) grupos.set(nombreCat, []);
+    grupos.get(nombreCat)!.push(item);
+  }
 
   return (
     <main className="max-w-md mx-auto p-4 pb-10 flex flex-col gap-6 min-h-screen bg-surface">
@@ -36,17 +47,21 @@ export default function ResumenConteoPage({ params }: { params: { id: string } }
         {new Date(conteo.fecha).toLocaleTimeString('es-BO', { hour: '2-digit', minute: '2-digit' })}
       </p>
 
-      {porCategoria.map(({ categoria, items }) => (
-        <div key={categoria.id} className="flex flex-col gap-2">
-          <h2 className="font-semibold text-slate-300">{categoria.nombre}</h2>
+      {Array.from(grupos.entries()).map(([nombreCat, items]) => (
+        <div key={nombreCat} className="flex flex-col gap-2">
+          <h2 className="font-semibold text-slate-300">{nombreCat}</h2>
           {items.map(({ it, producto }) => (
             <div key={it.productoId} className="flex justify-between bg-surface-card rounded-xl px-4 py-3 border border-surface-border">
-              <span className="text-paper">{producto?.nombre}</span>
+              <span className="text-paper">{producto?.nombre ?? '(producto eliminado)'}</span>
               <span className="font-semibold text-brand">{it.totalUnidades} unidades</span>
             </div>
           ))}
         </div>
       ))}
+
+      {itemsConProducto.length === 0 && (
+        <p className="text-center text-muted py-6">Este conteo no tiene productos registrados.</p>
+      )}
 
       <div className="bg-brand text-white rounded-2xl p-5 flex flex-col gap-1">
         <div className="flex justify-between text-sm opacity-90">
@@ -58,6 +73,13 @@ export default function ResumenConteoPage({ params }: { params: { id: string } }
           <span>{conteo.totalUnidades}</span>
         </div>
       </div>
+
+      <button
+        onClick={() => router.push(`/count/editar/${conteo.id}`)}
+        className="py-4 rounded-2xl bg-surface-card border border-brand text-brand text-lg font-semibold"
+      >
+        ✎ Editar este conteo
+      </button>
 
       <button
         onClick={() => router.push('/count')}

@@ -212,18 +212,18 @@ export default function CountPage() {
         {productosFiltrados.map((p, idx) => (
           <div key={p.id} className="flex items-center gap-2">
             {modoOrdenar && (
-              <div className="flex flex-col shrink-0">
+              <div className="flex flex-col shrink-0 gap-1">
                 <button
                   onClick={() => moverProducto(p.id, 'subir')}
                   disabled={idx === 0}
-                  className="text-muted disabled:opacity-20 leading-none px-1"
+                  className="w-12 h-12 flex items-center justify-center text-2xl rounded-xl bg-surface-card border border-surface-border text-paper disabled:opacity-20 active:scale-95"
                 >
                   ▲
                 </button>
                 <button
                   onClick={() => moverProducto(p.id, 'bajar')}
                   disabled={idx === productosFiltrados.length - 1}
-                  className="text-muted disabled:opacity-20 leading-none px-1"
+                  className="w-12 h-12 flex items-center justify-center text-2xl rounded-xl bg-surface-card border border-surface-border text-paper disabled:opacity-20 active:scale-95"
                 >
                   ▼
                 </button>

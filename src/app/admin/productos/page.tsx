@@ -107,18 +107,18 @@ export default function AdminProductosPage() {
               <h2 className="text-sm font-semibold text-slate-300">{cat.nombre}</h2>
               {productosCategoria.map((p, idx) => (
                 <div key={p.id} className="bg-surface-card rounded-xl border border-surface-border p-4 flex items-center gap-2">
-                  <div className="flex flex-col">
+                  <div className="flex flex-col shrink-0 gap-1">
                     <button
                       onClick={() => moverProducto(p, 'subir')}
                       disabled={idx === 0}
-                      className="text-muted disabled:opacity-20 leading-none px-1"
+                      className="w-10 h-10 flex items-center justify-center text-xl rounded-lg bg-surface-cardHeader text-paper disabled:opacity-20 active:scale-95"
                     >
                       ▲
                     </button>
                     <button
                       onClick={() => moverProducto(p, 'bajar')}
                       disabled={idx === productosCategoria.length - 1}
-                      className="text-muted disabled:opacity-20 leading-none px-1"
+                      className="w-10 h-10 flex items-center justify-center text-xl rounded-lg bg-surface-cardHeader text-paper disabled:opacity-20 active:scale-95"
                     >
                       ▼
                     </button>
