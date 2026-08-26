@@ -63,15 +63,8 @@ export default function ResumenConteoPage({ params }: { params: { id: string } }
         <p className="text-center text-muted py-6">Este conteo no tiene productos registrados.</p>
       )}
 
-      <div className="bg-brand text-white rounded-2xl p-5 flex flex-col gap-1">
-        <div className="flex justify-between text-sm opacity-90">
-          <span>Total de productos contados</span>
-          <span>{conteo.totalProductos}</span>
-        </div>
-        <div className="flex justify-between text-xl font-bold">
-          <span>Total de unidades</span>
-          <span>{conteo.totalUnidades}</span>
-        </div>
+      <div className="flex justify-between items-center text-sm text-muted border-t border-surface-border pt-3">
+        <span>{conteo.totalProductos} productos · {conteo.totalUnidades} unidades en total</span>
       </div>
 
       <button
