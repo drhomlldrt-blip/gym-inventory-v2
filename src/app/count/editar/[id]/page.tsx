@@ -205,27 +205,25 @@ export default function EditarConteoPage({ params }: { params: { id: string } })
         )}
       </div>
 
-      <div className="fixed bottom-0 left-0 right-0 bg-surface-card border-t border-surface-border p-4">
-        <div className="max-w-md mx-auto flex flex-col gap-3">
-          <div className="flex justify-between text-xs text-slate-500">
-            <span>{productosContados} productos contados</span>
-            <span>{totalUnidadesGeneral} unidades</span>
+      <div className="fixed bottom-0 left-0 right-0 bg-surface-card/95 backdrop-blur border-t border-surface-border px-4 py-2.5">
+        <div className="max-w-md mx-auto flex items-center gap-2">
+          <div className="flex flex-col text-[11px] text-slate-500 leading-tight shrink-0 mr-1">
+            <span>{productosContados} contados</span>
+            <span className="text-slate-300 font-medium">{totalUnidadesGeneral} u.</span>
           </div>
-          <div className="flex gap-3">
-            <button
-              onClick={() => router.push(`/count/resumen/${conteo.id}`)}
-              className="flex-1 py-4 rounded-2xl border border-surface-border text-paper font-semibold"
-            >
-              Cancelar
-            </button>
-            <button
-              onClick={guardarCambios}
-              disabled={guardando}
-              className="flex-1 py-4 rounded-2xl bg-brand text-white font-semibold disabled:opacity-40"
-            >
-              {guardando ? 'Guardando...' : 'GUARDAR CAMBIOS'}
-            </button>
-          </div>
+          <button
+            onClick={() => router.push(`/count/resumen/${conteo.id}`)}
+            className="px-4 py-2.5 rounded-xl border border-surface-border text-paper text-sm font-semibold"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={guardarCambios}
+            disabled={guardando}
+            className="flex-1 py-2.5 rounded-xl bg-brand text-white text-sm font-semibold disabled:opacity-40"
+          >
+            {guardando ? 'Guardando...' : 'GUARDAR CAMBIOS'}
+          </button>
         </div>
       </div>
     </main>

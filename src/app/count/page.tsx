@@ -22,11 +22,18 @@ export default function CountPage() {
   const [borrador, setBorrador] = useState<EstadoBorrador>({});
   const [guardando, setGuardando] = useState(false);
   const [modoOrdenar, setModoOrdenar] = useState(false);
+  const [actualizando, setActualizando] = useState(false);
 
   useEffect(() => {
     if (!verificarSesionActiva(router)) return;
     descargarCatalogo();
   }, [router]);
+
+  async function actualizarCatalogoManual() {
+    setActualizando(true);
+    await descargarCatalogo();
+    setActualizando(false);
+  }
 
   const productos = useLiveQuery(async () => {
     const todos = await db.productos.where('estado').equals('ACTIVO').toArray();
@@ -248,16 +255,16 @@ export default function CountPage() {
       </div>
 
       {!modoOrdenar && (
-        <div className="fixed bottom-0 left-0 right-0 bg-surface-card border-t border-surface-border p-4">
-          <div className="max-w-md mx-auto flex flex-col gap-3">
-            <div className="flex justify-between text-sm text-slate-400">
-              <span>{productosContados} productos contados</span>
-              <span className="font-semibold text-white">{totalUnidadesGeneral} unidades</span>
+        <div className="fixed bottom-0 left-0 right-0 bg-surface-card/95 backdrop-blur border-t border-surface-border px-4 py-2">
+          <div className="max-w-md mx-auto flex items-center gap-3">
+            <div className="flex flex-col text-[11px] text-slate-500 leading-tight shrink-0">
+              <span>{productosContados} contados</span>
+              <span className="text-slate-300 font-medium">{totalUnidadesGeneral} u.</span>
             </div>
             <button
               onClick={guardarConteo}
               disabled={guardando || productosContados === 0}
-              className="py-4 rounded-2xl bg-brand text-white text-lg font-semibold disabled:opacity-40 active:scale-[0.98] transition"
+              className="flex-1 py-2.5 rounded-xl bg-brand text-white text-sm font-semibold disabled:opacity-40 active:scale-[0.98] transition"
             >
               {guardando ? 'Guardando...' : 'GUARDAR CONTEO'}
             </button>

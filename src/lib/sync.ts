@@ -67,7 +67,14 @@ export async function sincronizarPendientes(
 
   await asegurarAutenticacion();
 
-  const pendientes = await db.syncQueue.where('estado').equals('PENDIENTE').toArray();
+  // Se reintentan tanto las PENDIENTES (nunca se intentaron) como las que
+  // quedaron en ERROR (fallaron una vez, ej. por un corte de señal justo
+  // en ese momento). Sin esto, una operación que falla una sola vez queda
+  // atascada para siempre en ese dispositivo y nunca llega a los demás.
+  // Se limita a 15 intentos para no quedar en un bucle infinito si el
+  // problema es real (no solo de red).
+  const pendientes = (await db.syncQueue.where('estado').anyOf('PENDIENTE', 'ERROR').toArray())
+    .filter((op) => op.intentos < 15);
   if (pendientes.length === 0) {
     onEstado?.('sin-cambios');
     return;

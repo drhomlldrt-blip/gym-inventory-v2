@@ -53,5 +53,5 @@ export async function encolarOperacion(
 }
 
 export async function contarPendientesSync(): Promise<number> {
-  return db.syncQueue.where('estado').equals('PENDIENTE').count();
+  return db.syncQueue.where('estado').anyOf('PENDIENTE', 'ERROR').count();
 }
