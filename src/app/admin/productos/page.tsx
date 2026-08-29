@@ -49,22 +49,31 @@ export default function AdminProductosPage() {
 
   async function moverProducto(p: Producto, direccion: 'subir' | 'bajar') {
     if (!productos) return;
-    const listaCategoria = productos
-      .filter((x) => x.categoriaId === p.categoriaId)
-      .sort((a, b) => a.orden - b.orden);
-    const idx = listaCategoria.findIndex((x) => x.id === p.id);
+    // El orden ya no se separa por categoria: se puede intercalar
+    // "Bebidas", "Snacks" y "Otros" libremente, como el admin lo prefiera.
+    // Si hay empates (ej. productos nuevos con el mismo numero por
+    // defecto), usamos la fecha de creacion como desempate.
+    const lista = [...productos].sort(
+      (a, b) => a.orden - b.orden || a.fechaCreacion.localeCompare(b.fechaCreacion)
+    );
+
+    const idx = lista.findIndex((x) => x.id === p.id);
     const idxVecino = direccion === 'subir' ? idx - 1 : idx + 1;
-    if (idxVecino < 0 || idxVecino >= listaCategoria.length) return;
+    if (idxVecino < 0 || idxVecino >= lista.length) return;
 
-    const vecino = listaCategoria[idxVecino];
+    // Intercambiamos posiciones en el arreglo...
+    [lista[idx], lista[idxVecino]] = [lista[idxVecino], lista[idx]];
+
+    // ...y reasignamos numeros de orden ÚNICOS y secuenciales (0,1,2,3...)
+    // a TODA la lista segun el nuevo orden.
     const ahora = new Date().toISOString();
-    const pActualizado = { ...p, orden: vecino.orden, fechaModificacion: ahora };
-    const vecinoActualizado = { ...vecino, orden: p.orden, fechaModificacion: ahora };
-
-    await db.productos.put(pActualizado);
-    await db.productos.put(vecinoActualizado);
-    await encolarOperacion({ tipo: 'PRODUCTO', entidadId: p.id, accion: 'ACTUALIZAR', payload: pActualizado });
-    await encolarOperacion({ tipo: 'PRODUCTO', entidadId: vecino.id, accion: 'ACTUALIZAR', payload: vecinoActualizado });
+    for (let i = 0; i < lista.length; i++) {
+      if (lista[i].orden !== i) {
+        const actualizado = { ...lista[i], orden: i, fechaModificacion: ahora };
+        await db.productos.put(actualizado);
+        await encolarOperacion({ tipo: 'PRODUCTO', entidadId: actualizado.id, accion: 'ACTUALIZAR', payload: actualizado });
+      }
+    }
   }
 
   return (
@@ -96,55 +105,54 @@ export default function AdminProductosPage() {
         + NUEVO PRODUCTO
       </button>
 
-      <div className="flex flex-col gap-5">
-        {(categorias ?? []).map((cat) => {
-          const productosCategoria = (productos ?? [])
-            .filter((p) => p.categoriaId === cat.id)
-            .sort((a, b) => a.orden - b.orden);
-          if (productosCategoria.length === 0) return null;
-          return (
-            <div key={cat.id} className="flex flex-col gap-2">
-              <h2 className="text-sm font-semibold text-slate-300">{cat.nombre}</h2>
-              {productosCategoria.map((p, idx) => (
-                <div key={p.id} className="bg-surface-card rounded-xl border border-surface-border p-4 flex items-center gap-2">
-                  <div className="flex flex-col shrink-0 gap-1">
-                    <button
-                      onClick={() => moverProducto(p, 'subir')}
-                      disabled={idx === 0}
-                      className="w-10 h-10 flex items-center justify-center text-xl rounded-lg bg-surface-cardHeader text-paper disabled:opacity-20 active:scale-95"
-                    >
-                      ▲
-                    </button>
-                    <button
-                      onClick={() => moverProducto(p, 'bajar')}
-                      disabled={idx === productosCategoria.length - 1}
-                      className="w-10 h-10 flex items-center justify-center text-xl rounded-lg bg-surface-cardHeader text-paper disabled:opacity-20 active:scale-95"
-                    >
-                      ▼
-                    </button>
-                  </div>
-                  <button className="text-left flex-1" onClick={() => setEditando(p)}>
-                    <p className="font-medium text-paper">{p.nombre}</p>
-                    <p className="text-xs text-muted">
-                      {p.tipoPresentacion === 'UNIDAD' ? 'Solo por unidad' : `${p.unidadesPorPaquete} u/${p.tipoPresentacion.toLowerCase()}`}
-                      {' · '}
-                      {(p.ubicacionesHabilitadas ?? []).length} ubicación(es)
-                    </p>
-                  </button>
-                  <button
-                    onClick={() => alternarActivo(p)}
-                    className={`text-xs px-3 py-1.5 rounded-full font-semibold whitespace-nowrap ${p.estado === 'ACTIVO' ? 'bg-brand/15 text-brand' : 'bg-surface-cardHeader text-muted'}`}
-                  >
-                    {p.estado}
-                  </button>
-                  <button onClick={() => eliminar(p)} className="text-brand text-lg leading-none">
-                    ✕
-                  </button>
-                </div>
-              ))}
+      <div className="flex flex-col gap-2">
+        {(() => {
+          const listaOrdenada = [...(productos ?? [])].sort((a, b) => a.orden - b.orden);
+          const nombreCategoria = (id: string) =>
+            (categorias ?? []).find((c) => c.id === id)?.nombre ?? '';
+          return listaOrdenada.map((p, idx) => (
+            <div key={p.id} className="bg-surface-card rounded-xl border border-surface-border p-4 flex items-center gap-2">
+              <div className="flex flex-col shrink-0 gap-1">
+                <button
+                  onClick={() => moverProducto(p, 'subir')}
+                  disabled={idx === 0}
+                  className="w-10 h-10 flex items-center justify-center text-xl rounded-lg bg-surface-cardHeader text-paper disabled:opacity-20 active:scale-95"
+                >
+                  ▲
+                </button>
+                <button
+                  onClick={() => moverProducto(p, 'bajar')}
+                  disabled={idx === listaOrdenada.length - 1}
+                  className="w-10 h-10 flex items-center justify-center text-xl rounded-lg bg-surface-cardHeader text-paper disabled:opacity-20 active:scale-95"
+                >
+                  ▼
+                </button>
+              </div>
+              <button className="text-left flex-1" onClick={() => setEditando(p)}>
+                <p className="font-medium text-paper">{p.nombre}</p>
+                <p className="text-xs text-muted">
+                  {nombreCategoria(p.categoriaId)}
+                  {' · '}
+                  {p.tipoPresentacion === 'UNIDAD' ? 'Solo por unidad' : `${p.unidadesPorPaquete} u/${p.tipoPresentacion.toLowerCase()}`}
+                  {' · '}
+                  {(p.ubicacionesHabilitadas ?? []).length} ubicación(es)
+                </p>
+              </button>
+              <button
+                onClick={() => alternarActivo(p)}
+                className={`text-xs px-3 py-1.5 rounded-full font-semibold whitespace-nowrap ${p.estado === 'ACTIVO' ? 'bg-brand/15 text-brand' : 'bg-surface-cardHeader text-muted'}`}
+              >
+                {p.estado}
+              </button>
+              <button onClick={() => eliminar(p)} className="text-brand text-lg leading-none">
+                ✕
+              </button>
             </div>
-          );
-        })}
+          ));
+        })()}
+        {(productos ?? []).length === 0 && (
+          <p className="text-center text-muted py-6">No hay productos todavía.</p>
+        )}
       </div>
 
       {creando && (
@@ -152,6 +160,7 @@ export default function AdminProductosPage() {
           categorias={categorias ?? []}
           ubicaciones={ubicaciones ?? []}
           tiposEmpaque={tiposEmpaque ?? []}
+          productosExistentes={productos ?? []}
           onCerrar={() => setCreando(false)}
         />
       )}
@@ -162,6 +171,7 @@ export default function AdminProductosPage() {
           categorias={categorias ?? []}
           ubicaciones={ubicaciones ?? []}
           tiposEmpaque={tiposEmpaque ?? []}
+          productosExistentes={productos ?? []}
           onCerrar={() => setEditando(null)}
         />
       )}
@@ -174,12 +184,14 @@ function FormularioProducto({
   categorias,
   ubicaciones,
   tiposEmpaque,
+  productosExistentes,
   onCerrar,
 }: {
   productoExistente?: Producto;
   categorias: { id: string; nombre: string }[];
   ubicaciones: { id: string; nombre: string }[];
   tiposEmpaque: TipoEmpaque[];
+  productosExistentes: Producto[];
   onCerrar: () => void;
 }) {
   const [nombre, setNombre] = useState(productoExistente?.nombre ?? '');
@@ -213,6 +225,10 @@ function FormularioProducto({
       await db.productos.put(actualizado);
       await encolarOperacion({ tipo: 'PRODUCTO', entidadId: actualizado.id, accion: 'ACTUALIZAR', payload: actualizado });
     } else {
+      // El siguiente numero disponible se calcula sobre TODOS los
+      // productos (orden libre, sin separar por categoria).
+      const maxOrden = productosExistentes.reduce((max, p) => Math.max(max, p.orden), -1);
+
       const producto: Producto = {
         id: `prod_${Date.now()}`,
         nombre: nombre.trim(),
@@ -222,7 +238,7 @@ function FormularioProducto({
         unidadesPorPaquete: presentacion === 'UNIDAD' ? 1 : unidadesPorPaquete,
         ubicacionesHabilitadas: ubicacionesSel,
         estado: 'ACTIVO',
-        orden: 999,
+        orden: maxOrden + 1,
         fechaCreacion: ahora,
         fechaModificacion: ahora,
       };
