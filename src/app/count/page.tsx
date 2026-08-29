@@ -21,20 +21,14 @@ export default function CountPage() {
   const [categoriaActiva, setCategoriaActiva] = useState<string | 'TODAS'>('TODAS');
   const [borrador, setBorrador] = useState<EstadoBorrador>({});
   const [guardando, setGuardando] = useState(false);
-  const [modoOrdenar, setModoOrdenar] = useState(false);
-  const [actualizando, setActualizando] = useState(false);
 
   useEffect(() => {
     if (!verificarSesionActiva(router)) return;
     descargarCatalogo();
   }, [router]);
 
-  async function actualizarCatalogoManual() {
-    setActualizando(true);
-    await descargarCatalogo();
-    setActualizando(false);
-  }
-
+  // El orden de los productos lo define unicamente el Administrador
+  // (Admin > Productos). La recepcion solo cuenta, en ese mismo orden.
   const productos = useLiveQuery(async () => {
     const todos = await db.productos.where('estado').equals('ACTIVO').toArray();
     return todos.sort((a, b) => a.orden - b.orden);
@@ -80,28 +74,6 @@ export default function CountPage() {
       delete copia[productoId];
       return copia;
     });
-  }
-
-  async function moverProducto(productoId: string, direccion: 'subir' | 'bajar') {
-    if (!productos) return;
-    const producto = productos.find((p) => p.id === productoId);
-    if (!producto) return;
-    const listaCategoria = productos
-      .filter((x) => x.categoriaId === producto.categoriaId)
-      .sort((a, b) => a.orden - b.orden);
-    const idx = listaCategoria.findIndex((x) => x.id === productoId);
-    const idxVecino = direccion === 'subir' ? idx - 1 : idx + 1;
-    if (idxVecino < 0 || idxVecino >= listaCategoria.length) return;
-
-    const vecino = listaCategoria[idxVecino];
-    const ahora = new Date().toISOString();
-    const pActualizado = { ...producto, orden: vecino.orden, fechaModificacion: ahora };
-    const vecinoActualizado = { ...vecino, orden: producto.orden, fechaModificacion: ahora };
-
-    await db.productos.put(pActualizado);
-    await db.productos.put(vecinoActualizado);
-    await encolarOperacion({ tipo: 'PRODUCTO', entidadId: producto.id, accion: 'ACTUALIZAR', payload: pActualizado });
-    await encolarOperacion({ tipo: 'PRODUCTO', entidadId: vecino.id, accion: 'ACTUALIZAR', payload: vecinoActualizado });
   }
 
   const totalUnidadesGeneral = useMemo(() => {
@@ -166,16 +138,8 @@ export default function CountPage() {
     <main className="max-w-md mx-auto pb-32 min-h-screen bg-surface">
       <header className="sticky top-0 bg-surface/95 backdrop-blur z-10 p-4 flex flex-col gap-3 border-b border-surface-border">
         <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-xl font-bold text-white">Inventario</h1>
-          </div>
+          <h1 className="text-xl font-bold text-white">Inventario</h1>
           <div className="flex items-center gap-3">
-            <button
-              onClick={() => setModoOrdenar((v) => !v)}
-              className={`text-xs underline ${modoOrdenar ? 'text-brand' : 'text-slate-400'}`}
-            >
-              {modoOrdenar ? 'Listo' : 'Ordenar'}
-            </button>
             <button
               onClick={() => router.push('/historial')}
               className="text-xs text-slate-400 underline"
@@ -185,11 +149,6 @@ export default function CountPage() {
             <SyncIndicator />
           </div>
         </div>
-        {modoOrdenar && (
-          <p className="text-xs text-muted">
-            Usa las flechas para poner primero los productos que más cuentas.
-          </p>
-        )}
         <input
           placeholder="Buscar producto..."
           value={busqueda}
@@ -216,61 +175,38 @@ export default function CountPage() {
       </header>
 
       <div className="p-4 flex flex-col gap-4">
-        {productosFiltrados.map((p, idx) => (
-          <div key={p.id} className="flex items-center gap-2">
-            {modoOrdenar && (
-              <div className="flex flex-col shrink-0 gap-1">
-                <button
-                  onClick={() => moverProducto(p.id, 'subir')}
-                  disabled={idx === 0}
-                  className="w-12 h-12 flex items-center justify-center text-2xl rounded-xl bg-surface-card border border-surface-border text-paper disabled:opacity-20 active:scale-95"
-                >
-                  ▲
-                </button>
-                <button
-                  onClick={() => moverProducto(p.id, 'bajar')}
-                  disabled={idx === productosFiltrados.length - 1}
-                  className="w-12 h-12 flex items-center justify-center text-2xl rounded-xl bg-surface-card border border-surface-border text-paper disabled:opacity-20 active:scale-95"
-                >
-                  ▼
-                </button>
-              </div>
-            )}
-            <div className="flex-1">
-              <ProductoConteoCard
-                producto={p}
-                ubicaciones={ubicaciones ?? []}
-                paquetes={borrador[p.id]?.paquetes ?? 0}
-                cantidadesPorUbicacion={borrador[p.id]?.cantidadesPorUbicacion ?? {}}
-                onCambiarPaquetes={(v) => actualizarPaquetes(p.id, v)}
-                onCambiarUbicacion={(ubicId, v) => actualizarUbicacion(p.id, ubicId, v)}
-                onLimpiar={() => limpiarProducto(p.id)}
-              />
-            </div>
-          </div>
+        {productosFiltrados.map((p) => (
+          <ProductoConteoCard
+            key={p.id}
+            producto={p}
+            ubicaciones={ubicaciones ?? []}
+            paquetes={borrador[p.id]?.paquetes ?? 0}
+            cantidadesPorUbicacion={borrador[p.id]?.cantidadesPorUbicacion ?? {}}
+            onCambiarPaquetes={(v) => actualizarPaquetes(p.id, v)}
+            onCambiarUbicacion={(ubicId, v) => actualizarUbicacion(p.id, ubicId, v)}
+            onLimpiar={() => limpiarProducto(p.id)}
+          />
         ))}
         {productosFiltrados.length === 0 && (
           <p className="text-center text-slate-500 py-10">No se encontraron productos.</p>
         )}
       </div>
 
-      {!modoOrdenar && (
-        <div className="fixed bottom-0 left-0 right-0 bg-surface-card/95 backdrop-blur border-t border-surface-border px-4 py-2">
-          <div className="max-w-md mx-auto flex items-center gap-3">
-            <div className="flex flex-col text-[11px] text-slate-500 leading-tight shrink-0">
-              <span>{productosContados} contados</span>
-              <span className="text-slate-300 font-medium">{totalUnidadesGeneral} u.</span>
-            </div>
-            <button
-              onClick={guardarConteo}
-              disabled={guardando || productosContados === 0}
-              className="flex-1 py-2.5 rounded-xl bg-brand text-white text-sm font-semibold disabled:opacity-40 active:scale-[0.98] transition"
-            >
-              {guardando ? 'Guardando...' : 'GUARDAR CONTEO'}
-            </button>
+      <div className="fixed bottom-0 left-0 right-0 bg-surface-card/95 backdrop-blur border-t border-surface-border px-4 py-2">
+        <div className="max-w-md mx-auto flex items-center gap-3">
+          <div className="flex flex-col text-[11px] text-slate-500 leading-tight shrink-0">
+            <span>{productosContados} contados</span>
+            <span className="text-slate-300 font-medium">{totalUnidadesGeneral} u.</span>
           </div>
+          <button
+            onClick={guardarConteo}
+            disabled={guardando || productosContados === 0}
+            className="flex-1 py-2.5 rounded-xl bg-brand text-white text-sm font-semibold disabled:opacity-40 active:scale-[0.98] transition"
+          >
+            {guardando ? 'Guardando...' : 'GUARDAR CONTEO'}
+          </button>
         </div>
-      )}
+      </div>
     </main>
   );
 }
