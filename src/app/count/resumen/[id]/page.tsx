@@ -15,24 +15,19 @@ export default function ResumenConteoPage({ params }: { params: { id: string } }
     return <div className="p-8 text-center text-muted min-h-screen bg-surface">Cargando...</div>;
   }
 
-  // Se listan TODOS los items del conteo directamente, sin depender de que
-  // la categoria del producto calce perfecto. Así nunca desaparece un
-  // producto de la vista solo porque su categoría cambió o se eliminó.
-  const itemsConProducto = conteo.items.map((it) => ({
-    it,
-    producto: productos.find((p) => p.id === it.productoId),
-  }));
+  // Se listan TODOS los items del conteo, en el MISMO orden libre que el
+  // administrador definio en Admin > Productos (sin volver a separarlos
+  // por categoria, que es justo lo que rompia ese orden).
+  const itemsOrdenados = conteo.items
+    .map((it) => ({
+      it,
+      producto: productos.find((p) => p.id === it.productoId),
+    }))
+    .sort((a, b) => (a.producto?.orden ?? 999999) - (b.producto?.orden ?? 999999));
 
   function nombreCategoria(categoriaId?: string) {
-    if (!categoriaId || !categorias) return 'Otros';
-    return categorias.find((c) => c.id === categoriaId)?.nombre ?? 'Otros';
-  }
-
-  const grupos = new Map<string, typeof itemsConProducto>();
-  for (const item of itemsConProducto) {
-    const nombreCat = nombreCategoria(item.producto?.categoriaId);
-    if (!grupos.has(nombreCat)) grupos.set(nombreCat, []);
-    grupos.get(nombreCat)!.push(item);
+    if (!categoriaId || !categorias) return '';
+    return categorias.find((c) => c.id === categoriaId)?.nombre ?? '';
   }
 
   return (
@@ -47,19 +42,21 @@ export default function ResumenConteoPage({ params }: { params: { id: string } }
         {new Date(conteo.fecha).toLocaleTimeString('es-BO', { hour: '2-digit', minute: '2-digit' })}
       </p>
 
-      {Array.from(grupos.entries()).map(([nombreCat, items]) => (
-        <div key={nombreCat} className="flex flex-col gap-2">
-          <h2 className="font-semibold text-slate-300">{nombreCat}</h2>
-          {items.map(({ it, producto }) => (
-            <div key={it.productoId} className="flex justify-between bg-surface-card rounded-xl px-4 py-3 border border-surface-border">
-              <span className="text-paper">{producto?.nombre ?? '(producto eliminado)'}</span>
-              <span className="font-semibold text-brand">{it.totalUnidades} unidades</span>
+      <div className="flex flex-col gap-2">
+        {itemsOrdenados.map(({ it, producto }) => (
+          <div key={it.productoId} className="flex justify-between items-center bg-surface-card rounded-xl px-4 py-3 border border-surface-border">
+            <div>
+              <p className="text-paper">{producto?.nombre ?? '(producto eliminado)'}</p>
+              {producto && (
+                <p className="text-[11px] text-muted">{nombreCategoria(producto.categoriaId)}</p>
+              )}
             </div>
-          ))}
-        </div>
-      ))}
+            <span className="font-semibold text-brand">{it.totalUnidades} unidades</span>
+          </div>
+        ))}
+      </div>
 
-      {itemsConProducto.length === 0 && (
+      {itemsOrdenados.length === 0 && (
         <p className="text-center text-muted py-6">Este conteo no tiene productos registrados.</p>
       )}
 

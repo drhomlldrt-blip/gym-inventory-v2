@@ -122,7 +122,7 @@ export function iniciarListenerSync(onEstado?: Parameters<typeof sincronizarPend
   const handler = () => sincronizarTodo(onEstado);
   window.addEventListener('online', handler);
   handler();
-  const interval = setInterval(handler, 30000);
+  const interval = setInterval(handler, 15000);
   return () => {
     window.removeEventListener('online', handler);
     clearInterval(interval);
