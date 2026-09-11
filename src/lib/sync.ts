@@ -16,11 +16,11 @@ const COLECCION_POR_TIPO: Record<string, string> = {
   CONFIGURACION: 'configuracion',
 };
 
-const TABLAS_MAESTRAS: { tabla: 'productos' | 'categorias' | 'ubicaciones' | 'tiposEmpaque'; coleccion: string }[] = [
-  { tabla: 'productos', coleccion: 'productos' },
-  { tabla: 'categorias', coleccion: 'categorias' },
-  { tabla: 'ubicaciones', coleccion: 'ubicaciones' },
-  { tabla: 'tiposEmpaque', coleccion: 'tiposEmpaque' },
+const TABLAS_MAESTRAS: { tabla: 'productos' | 'categorias' | 'ubicaciones' | 'tiposEmpaque'; coleccion: string; tipoOp: string }[] = [
+  { tabla: 'productos', coleccion: 'productos', tipoOp: 'PRODUCTO' },
+  { tabla: 'categorias', coleccion: 'categorias', tipoOp: 'CATEGORIA' },
+  { tabla: 'ubicaciones', coleccion: 'ubicaciones', tipoOp: 'UBICACION' },
+  { tabla: 'tiposEmpaque', coleccion: 'tiposEmpaque', tipoOp: 'TIPO_EMPAQUE' },
 ];
 
 export async function hayConexionReal(): Promise<boolean> {
@@ -30,6 +30,13 @@ export async function hayConexionReal(): Promise<boolean> {
 
 // BAJAR: trae el catalogo maestro mas reciente (incluida la configuracion,
 // que es la que evita volver a crear datos de ejemplo por error).
+//
+// IMPORTANTE: esto deja el catalogo local como un ESPEJO EXACTO de la nube,
+// no solo agrega/actualiza. Antes, si algo se borraba en la nube (ej. una
+// ubicacion que se creo mal y se volvio a crear con otro nombre), los
+// dispositivos que ya la tenian guardada localmente la conservaban para
+// siempre como un "fantasma" que ya no existia en ningun otro lado — eso
+// causaba inconsistencias raras entre celulares que parecian aleatorias.
 export async function descargarCatalogo(): Promise<boolean> {
   if (!firebaseConfigurado || !firestore) return false;
   const conectado = await hayConexionReal();
@@ -38,12 +45,30 @@ export async function descargarCatalogo(): Promise<boolean> {
   try {
     await asegurarAutenticacion();
 
-    for (const { tabla, coleccion } of TABLAS_MAESTRAS) {
+    // Ids que tienen una operacion propia sin subir todavia: nunca se
+    // borran localmente, para no perder algo creado offline que aun no
+    // llego a la nube.
+    const operacionesPendientes = await db.syncQueue.where('estado').anyOf('PENDIENTE', 'ERROR').toArray();
+
+    for (const { tabla, coleccion, tipoOp } of TABLAS_MAESTRAS) {
       const snap = await getDocs(collection(firestore, coleccion));
-      if (snap.empty) continue;
-      const registros = snap.docs.map((d) => d.data());
-      // @ts-expect-error acceso dinamico a la tabla de Dexie
-      await db[tabla].bulkPut(registros);
+      const registrosCloud = snap.docs.map((d) => d.data()) as { id: string }[];
+      const idsCloud = new Set(registrosCloud.map((r) => r.id));
+
+      if (registrosCloud.length > 0) {
+        // @ts-expect-error acceso dinamico a la tabla de Dexie
+        await db[tabla].bulkPut(registrosCloud);
+      }
+
+      const idsLocales: string[] = await db[tabla].toCollection().primaryKeys();
+      const idsConPendiente = new Set(
+        operacionesPendientes.filter((op) => op.tipo === tipoOp).map((op) => op.entidadId)
+      );
+      const idsAEliminar = idsLocales.filter((id) => !idsCloud.has(id) && !idsConPendiente.has(id));
+
+      if (idsAEliminar.length > 0) {
+        await db[tabla].bulkDelete(idsAEliminar);
+      }
     }
 
     // La configuracion es un solo documento, no una coleccion de varios.
