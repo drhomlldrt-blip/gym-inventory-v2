@@ -10,6 +10,8 @@ import { verificarSesionActiva } from '@/lib/auth-guard';
 import ProductoConteoCard from '@/components/ProductoConteoCard';
 import SyncIndicator from '@/components/SyncIndicator';
 
+const CLAVE_BORRADOR = 'borradorConteo';
+
 type EstadoBorrador = Record<
   string,
   { paquetes: number; cantidadesPorUbicacion: CantidadesPorUbicacion }
@@ -21,6 +23,27 @@ export default function CountPage() {
   const [categoriaActiva, setCategoriaActiva] = useState<string | 'TODAS'>('TODAS');
   const [borrador, setBorrador] = useState<EstadoBorrador>({});
   const [guardando, setGuardando] = useState(false);
+  const [borradorListo, setBorradorListo] = useState(false);
+
+  // El borrador se respalda en sessionStorage para que no se pierda si el
+  // celular apaga la pantalla y el sistema recarga o descarta la pagina
+  // (pasa en Android). Dura mientras la sesion siga abierta: si se cierra la
+  // app y se vuelve a ingresar, empieza de cero.
+  useEffect(() => {
+    try {
+      const guardado = sessionStorage.getItem(CLAVE_BORRADOR);
+      if (guardado) setBorrador(JSON.parse(guardado));
+    } catch {}
+    setBorradorListo(true);
+  }, []);
+
+  useEffect(() => {
+    if (!borradorListo) return;
+    try {
+      if (Object.keys(borrador).length === 0) sessionStorage.removeItem(CLAVE_BORRADOR);
+      else sessionStorage.setItem(CLAVE_BORRADOR, JSON.stringify(borrador));
+    } catch {}
+  }, [borrador, borradorListo]);
 
   useEffect(() => {
     if (!verificarSesionActiva(router)) return;
@@ -131,6 +154,7 @@ export default function CountPage() {
 
     setGuardando(false);
     setBorrador({});
+    try { sessionStorage.removeItem(CLAVE_BORRADOR); } catch {}
     router.push(`/count/resumen/${conteo.id}`);
   }
 

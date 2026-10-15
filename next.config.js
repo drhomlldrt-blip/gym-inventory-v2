@@ -2,6 +2,11 @@ const withPWA = require('next-pwa')({
   dest: 'public',
   register: true,
   skipWaiting: true,
+  // Por defecto next-pwa hace location.reload() cada vez que el navegador
+  // dispara el evento "online". En Android eso ocurre al encender la pantalla
+  // y borraba los numeros del conteo en curso. La app ya sincroniza sola
+  // cuando vuelve la conexion, asi que la recarga no hace falta.
+  reloadOnOnline: false,
   disable: process.env.NODE_ENV === 'development',
   runtimeCaching: [
     {

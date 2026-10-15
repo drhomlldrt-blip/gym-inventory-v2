@@ -38,6 +38,14 @@ export default function LoginPage() {
       return;
     }
 
+    // Un ingreso nuevo empieza sin borradores de conteos anteriores.
+    try {
+      sessionStorage.removeItem('borradorConteo');
+      Object.keys(sessionStorage)
+        .filter((k) => k.startsWith('borradorEdicion_'))
+        .forEach((k) => sessionStorage.removeItem(k));
+    } catch {}
+
     sessionStorage.setItem('rolActivo', rolElegido);
     router.push(rolElegido === 'ADMINISTRADOR' ? '/admin/productos' : '/count');
   }

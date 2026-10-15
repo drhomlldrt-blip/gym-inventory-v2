@@ -16,6 +16,7 @@ type EstadoBorrador = Record<
 
 export default function EditarConteoPage({ params }: { params: { id: string } }) {
   const router = useRouter();
+  const clave = `borradorEdicion_${params.id}`;
   const [borrador, setBorrador] = useState<EstadoBorrador>({});
   const [cargado, setCargado] = useState(false);
   const [guardando, setGuardando] = useState(false);
@@ -41,10 +42,25 @@ export default function EditarConteoPage({ params }: { params: { id: string } })
           cantidadesPorUbicacion: item.cantidadesPorUbicacion,
         };
       }
-      setBorrador(inicial);
+      // Si la pantalla se apago y la pagina se recargo, se recupera lo que
+      // se estaba editando en vez de volver a lo ultimo guardado.
+      let respaldo: EstadoBorrador | null = null;
+      try {
+        const guardado = sessionStorage.getItem(clave);
+        if (guardado) respaldo = JSON.parse(guardado);
+      } catch {}
+      setBorrador(respaldo ?? inicial);
       setCargado(true);
     }
-  }, [conteo, cargado]);
+  }, [conteo, cargado, clave]);
+
+  // Respalda cada cambio mientras se edita (solo despues de la precarga).
+  useEffect(() => {
+    if (!cargado) return;
+    try {
+      sessionStorage.setItem(clave, JSON.stringify(borrador));
+    } catch {}
+  }, [borrador, cargado, clave]);
 
   function actualizarPaquetes(productoId: string, valor: number) {
     setBorrador((prev) => ({
@@ -142,6 +158,7 @@ export default function EditarConteoPage({ params }: { params: { id: string } })
     });
 
     setGuardando(false);
+    try { sessionStorage.removeItem(clave); } catch {}
     router.push(`/count/resumen/${conteo.id}`);
   }
 
@@ -212,7 +229,10 @@ export default function EditarConteoPage({ params }: { params: { id: string } })
             <span className="text-slate-300 font-medium">{totalUnidadesGeneral} u.</span>
           </div>
           <button
-            onClick={() => router.push(`/count/resumen/${conteo.id}`)}
+            onClick={() => {
+              try { sessionStorage.removeItem(clave); } catch {}
+              router.push(`/count/resumen/${conteo.id}`);
+            }}
             className="px-4 py-2.5 rounded-xl border border-surface-border text-paper text-sm font-semibold"
           >
             Cancelar
